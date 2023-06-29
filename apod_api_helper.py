@@ -1,9 +1,7 @@
-import os
 import requests
 import json
+from config import nasa_api_key
 import datetime
-
-nasa_api_key = os.getenv("NASA_API_KEY")
 
 class ApodApiHelper:
     def get_apod_data(self):
