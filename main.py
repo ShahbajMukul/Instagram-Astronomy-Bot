@@ -1,7 +1,3 @@
-import schedule
-from datetime import time, timedelta, datetime
-
-from config import nasa_api_key, instagram_id, instagram_access_token
 from apod_api_helper import ApodApiHelper
 from instagram_api_helper import InstagramApiHelper
 
