@@ -39,7 +39,7 @@ def work():
         result = post_APOD.publish_media(media_id)
         print("\n" + result + "\n")
 
-schedule.every().day.at("8:35").do(work)
+schedule.every().day.at("8:36").do(work)
 
 while True:
     schedule.run_pending()
