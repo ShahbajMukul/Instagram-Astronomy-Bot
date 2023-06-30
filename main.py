@@ -43,7 +43,7 @@ def work():
 
 
 
-schedule.every().day.at("10:08:00").do(work)
+schedule.every().day.at("10:10:00").do(work)
 
 while True:
     schedule.run_pending()
