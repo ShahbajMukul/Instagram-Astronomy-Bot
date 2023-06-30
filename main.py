@@ -1,10 +1,9 @@
 from datetime import datetime
-from config import nasa_api_key, instagram_id, instagram_access_token
 from apod_api_helper import ApodApiHelper
 from instagram_api_helper import InstagramApiHelper
 
 
-print( '\n' + "Working" +"\n")
+print( '\n' + "Working" + "\n")
 
 apod_helper = ApodApiHelper()
 apod_data = apod_helper.get_apod_data()
@@ -26,13 +25,13 @@ else:
     date_str = apod_data["date"]
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     date = date_obj.strftime("%m/%d/%Y")
-
     explanation = apod_data["explanation"]
     image_url = apod_data["hdurl"]
+
 
     # Create an instance of the InstagramApiHelper class to post the image
     post_APOD = InstagramApiHelper()
     media_id = post_APOD.create_media_id(title, image_by, date, explanation, image_url, "APOD")
     result = post_APOD.publish_media(media_id)
-    print("\n" + result)
+    print("\n" + result + "\n")
 

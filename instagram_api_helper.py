@@ -1,10 +1,14 @@
 import requests
 import json
-import random
-from config import instagram_id, instagram_access_token
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
+instagram_id = os.getenv("INSTAGRAM_ID")
+instagram_access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 
 class InstagramApiHelper:
-
 
     def create_media_id(self, title, image_by, date, explanation, image_url, source):
         explanation = self.generate_emoji(explanation)
@@ -16,10 +20,6 @@ class InstagramApiHelper:
         data = json.loads(response.text)
         return data["id"]
     
-
-
-
-
 
     '''def create_media_id(self, title, image_by, date, explanation, image_url, source):
         caption = f"{source}\n\n{title}\n©:{image_by}\n\n{date}\n\n{explanation}"
@@ -35,6 +35,9 @@ class InstagramApiHelper:
         response = requests.post(url)
         if response.status_code == 200:
             return "Image posted successfully!"
+        # If the access token is expired, we get a 400 error code
+        elif response.status_code == 400:
+            return "The access token is expired!"
         else:
             return "Something went wrong while posting the image!"
         
