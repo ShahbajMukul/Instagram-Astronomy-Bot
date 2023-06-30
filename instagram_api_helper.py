@@ -13,7 +13,7 @@ class InstagramApiHelper:
     def create_media_id(self, title, image_by, date, explanation, image_url, source):
         explanation = self.generate_emoji(explanation)
 
-        caption = f"{source}\n\n{title}\n\n{explanation}\n\n©:{image_by}\n{date}"
+        caption = f"Test: {source}\n\n{title}\n\n{explanation}\n\n©:{image_by}\n{date}"
         final_caption = self.generate_hashtags(source, caption)
         url = f"https://graph.facebook.com/v17.0/{instagram_id}/media?image_url={image_url}&access_token={instagram_access_token}&caption={final_caption}"
         response = requests.post(url)
