@@ -21,14 +21,6 @@ class InstagramApiHelper:
         return data["id"]
     
 
-    '''def create_media_id(self, title, image_by, date, explanation, image_url, source):
-        caption = f"{source}\n\n{title}\n©:{image_by}\n\n{date}\n\n{explanation}"
-        caption = self.generate_emoji(caption)
-        final_caption = self.generate_hashtags(source, caption)
-        url = f"https://graph.facebook.com/v17.0/{instagram_id}/media?image_url={image_url}&access_token={instagram_access_token}&caption={final_caption}"
-        response = requests.post(url)
-        data = json.loads(response.text)
-        return data["id"]'''
     
     def publish_media(self, media_id):
         url = f"https://graph.facebook.com/v17.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={media_id}"

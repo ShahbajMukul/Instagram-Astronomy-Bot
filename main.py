@@ -4,7 +4,7 @@ from datetime import datetime
 from apod_api_helper import ApodApiHelper
 from instagram_api_helper import InstagramApiHelper
 
-
+posted = False
 
 def work():
     print( '\n' + "Working" + "\n")
@@ -39,6 +39,8 @@ def work():
         result = post_APOD.publish_media(media_id)
         print("\n" + result + "\n")
 
+        posted = True
+
 
 
 
@@ -47,6 +49,7 @@ def work():
 
 schedule.every(1).minutes.do(work)
 
-while True:
+while posted == False:
+    
     schedule.run_pending()
     time.sleep(1)
