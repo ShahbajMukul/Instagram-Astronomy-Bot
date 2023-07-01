@@ -44,8 +44,7 @@ def work():
         print("\n" + result + "\n")
 
 
-schedule.every().day.at("23:00:00").do(work)
-
+schedule.every().day.at("03:00:00").do(work)
 
 while True:
     schedule.run_pending()
