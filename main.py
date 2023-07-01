@@ -41,8 +41,7 @@ def work():
 
         posted = True
 
-
-schedule.every().day.at("07:15:00").do(work)
+schedule.every().day.at("14:00:00").do(work)
 
 while True:
     schedule.run_pending()
