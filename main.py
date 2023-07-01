@@ -42,14 +42,10 @@ def work():
         posted = True
 
 
+schedule.every().day.at("07:15:00").do(work)
 
-
-
-schedule.every().day.at("10:10:00").do(work)
-
-
-
-while posted == False:
-    
+while True:
     schedule.run_pending()
     time.sleep(1)
+
+
