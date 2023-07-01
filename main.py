@@ -6,6 +6,7 @@ from instagram_api_helper import InstagramApiHelper
 
 def work():
     print( '\n' + "Working" + "\n")
+    print("Current time: " + datetime.now().strftime("%H:%M:%S") + "\n")
 
     apod_helper = ApodApiHelper()
     apod_data = apod_helper.get_apod_data()
@@ -43,7 +44,8 @@ def work():
         print("\n" + result + "\n")
 
 
-schedule.every().day.at("14:00:00").do(work)
+schedule.every().day.at("23:00:00").do(work)
+
 
 while True:
     schedule.run_pending()
