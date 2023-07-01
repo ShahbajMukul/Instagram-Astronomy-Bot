@@ -29,7 +29,7 @@ class InstagramApiHelper:
             return "Image posted successfully!"
         # If the access token is expired, we get a 400 error code
         elif response.status_code == 400:
-            return "The access token is expired!"
+            return "Daily limit reached or the access token is expired!"
         else:
             return "Something went wrong while posting the image!"
         
