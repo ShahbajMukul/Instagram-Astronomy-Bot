@@ -26,11 +26,9 @@ class InstagramApiHelper:
 
     
     def publish_media(self, media_id):
-        if media_id == "Limit reached":
-            return "Daily limit reached!"
-
         url = f"https://graph.facebook.com/v17.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={media_id}"
         response = requests.post(url)
+        
         if response.status_code == 200:
             return "Image posted successfully!"
         # If the access token is expired, we get a 400 error code

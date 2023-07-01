@@ -4,8 +4,6 @@ from datetime import datetime
 from apod_api_helper import ApodApiHelper
 from instagram_api_helper import InstagramApiHelper
 
-posted = False
-
 def work():
     print( '\n' + "Working" + "\n")
 
@@ -37,9 +35,13 @@ def work():
         post_APOD = InstagramApiHelper()
         media_id = post_APOD.create_media_id(title, image_by, date, explanation, image_url, "APOD")
         result = post_APOD.publish_media(media_id)
+        # Retry posting the image in 2 hours if the result is not "Image posted successfully!"
+        if result != "Image posted successfully!":
+            print(f"Error posting image: {result}. Retrying in 2 hours...")
+            time.sleep(7200) # Wait for 2 hours (in seconds)
+            work()
         print("\n" + result + "\n")
 
-        posted = True
 
 schedule.every().day.at("14:00:00").do(work)
 
