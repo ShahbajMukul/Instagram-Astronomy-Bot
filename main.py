@@ -40,11 +40,11 @@ def work():
         if result != "Image posted successfully!":
             print(f"Error posting image: {result}. Retrying in 2 hours...")
             time.sleep(7200) # Wait for 2 hours (in seconds)
-            work()
+            
         print("\n" + result + "\n")
 
 
-schedule.every().day.at("03:00:00").do(work)
+schedule.every().day.at("14:00:00").do(work)
 
 while True:
     schedule.run_pending()
