@@ -20,11 +20,13 @@ class InstagramApiHelper:
         data = json.loads(response.text)
         if "id" in data:
             return data["id"]
+        elif "error" in data:
+            default_image_url = "https://www.nasa.gov/sites/default/files/styles/side_image/public/thumbnails/image/apod_logo.png?itok=6It-nhCr"
+            explanation+= "\n(Today's image is not supported by Instagram😣)"
+            self.create_media_id(title, image_by, date, explanation, default_image_url, source) #recursion is not so bad after all :)
         else:
             return "Limit reached"
-    
-
-    
+        
     def publish_media(self, media_id):
         url = f"https://graph.facebook.com/v17.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={media_id}"
         response = requests.post(url)
@@ -36,6 +38,8 @@ class InstagramApiHelper:
             return "likely the access token is expired!"
         else:
             return "Something went wrong while posting the image!"
+        #for some reason, the response is sometimes 403: Forbidden, but the image is still posted successfully
+        #will look into it later
         
     def generate_emoji(self, caption):
         if not isinstance(caption, str):

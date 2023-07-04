@@ -33,7 +33,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## TODO
 
-1. Mars Rover images posting
+1. Messaging feature where users can send a message in date format and the bot will post the image from that date (birthday, anniversary, etc.)
+2. Mars Rover images posting
 
 ## License
 
