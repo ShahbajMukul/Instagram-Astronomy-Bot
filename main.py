@@ -35,12 +35,7 @@ def work():
         # Create an instance of the InstagramApiHelper class to post the image
         post_APOD = InstagramApiHelper()
         media_id = post_APOD.create_media_id(title, image_by, date, explanation, image_url, "APOD")
-        result = post_APOD.publish_media(media_id)
-        # Retry posting the image in 2 hours if the result is not "Image posted successfully!"
-        if result != "Image posted successfully!":
-            print(f"Error posting image: {result}. Retrying in 2 hours...")
-            time.sleep(7200) # Wait for 2 hours (in seconds)
-            
+        result = post_APOD.publish_media(media_id)           
         print("\n" + result + "\n")
 
 
