@@ -25,6 +25,7 @@ class InstagramApiHelper:
             explanation+= "\n(Today's image is not supported by Instagram😣)"
             #recursion needs rework, will fix later
             # self.create_media_id(title, image_by, date, explanation, default_image_url, source) #recursion is not so bad after all :)
+            return "Recursion needs rework"
         else:
             return "Limit reached"
         
