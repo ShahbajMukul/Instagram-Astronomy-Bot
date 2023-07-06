@@ -23,7 +23,8 @@ class InstagramApiHelper:
         elif "error" in data:
             default_image_url = "https://www.nasa.gov/sites/default/files/styles/side_image/public/thumbnails/image/apod_logo.png?itok=6It-nhCr"
             explanation+= "\n(Today's image is not supported by Instagram😣)"
-            self.create_media_id(title, image_by, date, explanation, default_image_url, source) #recursion is not so bad after all :)
+            #recursion needs rework, will fix later
+            # self.create_media_id(title, image_by, date, explanation, default_image_url, source) #recursion is not so bad after all :)
         else:
             return "Limit reached"
         
