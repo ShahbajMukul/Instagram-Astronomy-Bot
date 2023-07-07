@@ -12,4 +12,6 @@ class ApodApiHelper:
        url = f"https://api.nasa.gov/planetary/apod?api_key={nasa_api_key}"
        response = requests.get(url)
        data = json.loads(response.text)
+       data["copyright"] = data["copyright"].replace(" \n", ",").strip(",")
+
        return data 

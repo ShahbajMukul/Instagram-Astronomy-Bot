@@ -2,5 +2,8 @@
   "docwriter.progress.trackFunctions": true,
   "docwriter.progress.trackClasses": false,
   "docwriter.progress.trackTypes": true,
-  "docwriter.progress.trackMethods": false
+  "docwriter.progress.trackMethods": false,
+  "python.testing.pytestArgs": ["Tests"],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }
