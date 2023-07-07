@@ -8,11 +8,11 @@ A bot that posts astronomy pictures from NASA's API to Instagram.
 
 - [Pipenv](https://docs.pipenv.org/en/latest/)
 
-- [NASA API key](https://api.nasa.gov/index.html#apply-for-an-api-key)
+- [NASA API key](https://api.nasa.gov/index.html#apply-for-an-api-key):
   fill out the form and you will receive an email with your API key
 
-- [Instagram API key](<[https://www.instagram.com/developer/](https://developers.facebook.com/docs/instagram-api/)>)
-  the process is a bit more complicated, but you can follow [this tutorial](<[Title](https://levelup.gitconnected.com/automating-instagram-posts-with-python-and-instagram-graph-api-374f084b9f2b)>) to get your Instagram ID and Access Token
+- [Instagram API key](https://developers.facebook.com/docs/instagram-api/)
+  : the process is a bit more complicated, but you can follow [this tutorial](<[Title](https://levelup.gitconnected.com/automating-instagram-posts-with-python-and-instagram-graph-api-374f084b9f2b)>) to get your Instagram ID and Access Token
 
 ## How to use
 
@@ -36,7 +36,7 @@ pipenv run python main.py
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## TODO
+## ToDo
 
 1. Messaging feature where users can send a message in date format and the bot will send them the image from that date (birthday, anniversary, etc.)
 2. Mars Rover images posting
