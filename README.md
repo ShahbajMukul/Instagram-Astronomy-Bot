@@ -12,7 +12,7 @@ A bot that posts astronomy pictures from NASA's API to Instagram.
   fill out the form and you will receive an email with your API key
 
 - [Instagram API key](https://developers.facebook.com/docs/instagram-api/)
-  : the process is a bit more complicated, but you can follow [this tutorial](<[Title](https://levelup.gitconnected.com/automating-instagram-posts-with-python-and-instagram-graph-api-374f084b9f2b)>) to get your Instagram ID and Access Token
+  : the process is a bit more complicated, but you can follow [this tutorial](https://levelup.gitconnected.com/automating-instagram-posts-with-python-and-instagram-graph-api-374f084b9f2b) to get your Instagram ID and Access Token
 
 ## How to use
 
