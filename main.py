@@ -22,7 +22,7 @@ def work():
         image_by = apod_data.get('copyright')
         if image_by is None:
             image_by = "Research Team"
-        # date = apod_data["date"]
+       
 
         # Extract the date from the APOD data and format it as "MM/DD/YYYY"
         date_str = apod_data["date"]
@@ -30,13 +30,18 @@ def work():
         date = date_obj.strftime("%m/%d/%Y")
         explanation = apod_data["explanation"]
         image_url = apod_data["hdurl"]
+        
+
 
 
         # Create an instance of the InstagramApiHelper class to post the image
         post_APOD = InstagramApiHelper()
-        media_id = post_APOD.create_media_id(title, image_by, date, explanation, image_url, "APOD")
-        result = post_APOD.publish_media(media_id)           
+        caption = post_APOD.write_caption(title, image_by, date, explanation, "APOD")
+        media_id = post_APOD.create_media_id(image_url, caption)
+        result = post_APOD.publish_media(media_id, image_url, caption)           
         print("\n" + result + "\n")
+
+
 
 
 schedule.every().day.at("14:00:00").do(work)

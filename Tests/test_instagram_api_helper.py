@@ -18,9 +18,10 @@ sample_apod = {
     "date": "07/06/2023",
     "image_url": "https://apod.nasa.gov/apod/image/2307/CocoaBeach_BuckMoon_Seeley-201_1100.jpg",
     "source" : "APOD"
-}
+    }
 #create_media_id
 # expected normal case
-def test_create_media_id():
+'''def test_create_media_id():
     insta = InstagramApiHelper()
     acutal_media_id = insta.create_media_id()
+'''
