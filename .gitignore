@@ -35,6 +35,8 @@ MANIFEST
 
 # Imgur Uploader
 imgur_api_helper.py
+test_image_processing.py
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt

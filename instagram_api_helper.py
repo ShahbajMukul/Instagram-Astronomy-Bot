@@ -1,8 +1,6 @@
 import requests
 import json
 import os
-from PIL import Image
-from io import BytesIO
 from dotenv import load_dotenv
 load_dotenv()
 
