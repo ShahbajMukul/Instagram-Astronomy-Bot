@@ -13,7 +13,7 @@ class ApodApiHelper:
        response = requests.get(url)
        data = json.loads(response.text)
        try:
-           data["copyright"] = data["copyright"].replace(" \n", ",").lstrip()
+           data["copyright"] = data["copyright"].replace("\n", ",").lstrip()
        except KeyError:
            pass
 
