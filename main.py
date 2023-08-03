@@ -8,8 +8,7 @@ def work():
     print( '\n' + "Working" + "\n")
     print("Current time: " + datetime.now().strftime("%H:%M:%S") + "\n")
 
-    apod_helper = ApodApiHelper()
-    apod_data = apod_helper.get_apod_data()
+    
     apod_helper = ApodApiHelper()
     apod_data = apod_helper.get_apod_data()
 
@@ -38,7 +37,7 @@ def work():
         post_APOD = InstagramApiHelper()
         caption = post_APOD.write_caption(title, image_by, date, explanation, "APOD")
         media_id = post_APOD.create_media_id(image_url, caption)
-        result = post_APOD.publish_media(media_id, image_url, caption)           
+        result = post_APOD.publish_media(media_id, caption)           
         print("\n" + result + "\n")
 
 
