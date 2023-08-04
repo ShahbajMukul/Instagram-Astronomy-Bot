@@ -41,10 +41,13 @@ def work():
         print("\n" + result + "\n")
 
 
+for i in range(5):
+    work()
+    time.sleep(120)
+    
+# schedule.every().day.at("14:00:00").do(work)
 
-schedule.every().day.at("14:00:00").do(work)
-
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+# while True:
+#     schedule.run_pending()
+#     time.sleep(1)
 
