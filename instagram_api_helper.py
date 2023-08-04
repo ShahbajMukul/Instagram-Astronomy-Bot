@@ -30,7 +30,7 @@ class InstagramApiHelper:
         if "id" in data:
             return data["id"]
         elif "error" in data:
-            print("Error(create_media_function): " + data["error"]["message"] + "\n")
+            print("Error from create_media_id: " + data["error"]["message"] + "\n")
             return "Something went wrong. Check the Error:" + data["error"]["message"] + "\n"
         else:
             return "Limit reached"
@@ -48,7 +48,7 @@ class InstagramApiHelper:
             return "Something went wrong while posting the image!"
 
     def post_default_image(self, caption):
-        print("Access token might be expired or Image format is not supported. Trying again... \n")
+        print("\nPosting default image... \n")
         default_image_url = "https://www.nasa.gov/sites/default/files/styles/side_image/public/thumbnails/image/apod_logo.png?itok=6It-nhCr"
         caption += "\nToday's APOD is not supported by Instagram 😞"
         post_id = self.create_media_id(default_image_url, caption)
