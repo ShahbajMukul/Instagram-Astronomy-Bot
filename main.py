@@ -1,5 +1,5 @@
 import time
-import schedule
+#import schedule
 from datetime import datetime
 from apod_api_helper import ApodApiHelper
 from instagram_api_helper import InstagramApiHelper
@@ -43,9 +43,11 @@ def work():
 
 
 
-schedule.every().day.at("14:00:00").do(work)
+## schedule.every().day.at("14:00:00").do(work)
 
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+##while True:
+ ##   schedule.run_pending()
+##    time.sleep(1)
 
+comment = InstagramApiHelper()
+comment.comment_on_nasa_post()
