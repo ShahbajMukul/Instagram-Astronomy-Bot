@@ -49,5 +49,9 @@ def work():
  ##   schedule.run_pending()
 ##    time.sleep(1)
 
+## comment = InstagramApiHelper()
+## comment.comment_on_nasa_post()
+
 comment = InstagramApiHelper()
-comment.comment_on_nasa_post()
+newVal = comment.get_user_post('nasa')
+print(newVal)

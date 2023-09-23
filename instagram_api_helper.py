@@ -90,8 +90,20 @@ class InstagramApiHelper:
         if source == "APOD":
             caption += "\n\n%23NASA %23APOD %23Astronomy %23Space %23Science"
         #More to be added later
-        return caption     
+        return caption 
 
+
+
+
+    def get_user_post(self, user):
+        media_url = f"https://graph.facebook.com/v17.0/{user}/media?access_token={instagram_access_token}"
+        media_response = requests.get(media_url)
+        media_data = media_response.json()
+        if "data" in media_data and len(media_data["data"]) > 0:
+            return media_data["data"][0]
+        else:
+            return None
+'''
     # Make a function that will comment on latest NASA posts
     def comment_on_nasa_post(self):
         nasa_user_id = 528817151
@@ -116,7 +128,7 @@ class InstagramApiHelper:
         user_data = user_response.json()
         user_id = user_data["id"]
         return user_id
-
+'''
 
 '''
 #Tried to use this to format the image, but it didn't work. Time constraints.
