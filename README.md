@@ -1,6 +1,7 @@
 # Instagram-Astronomy-Bot
 
 A bot that posts astronomy pictures from NASA's API to Instagram.
+https://www.instagram.com/daily_dose_of_cosmos/
 
 ## Prerequisites
 
