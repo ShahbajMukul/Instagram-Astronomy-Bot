@@ -42,10 +42,13 @@ def work():
 
 
 
-
+'''
 schedule.every().day.at("14:00:00").do(work)
 
 while True:
     schedule.run_pending()
     time.sleep(1)
 
+'''
+
+work()

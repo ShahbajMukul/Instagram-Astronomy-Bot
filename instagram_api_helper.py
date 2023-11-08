@@ -24,7 +24,7 @@ class InstagramApiHelper:
 
 
     def create_media_id(self, image_url, caption):
-        url = f"https://graph.facebook.com/v17.0/{instagram_id}/media?image_url={image_url}&access_token={instagram_access_token}&caption={caption}"
+        url = f"https://graph.facebook.com/v18.0/{instagram_id}/media?image_url={image_url}&access_token={instagram_access_token}&caption={caption}"
         response = requests.post(url)
         data = json.loads(response.text)
         if "id" in data:
@@ -37,7 +37,7 @@ class InstagramApiHelper:
         
 
     def publish_media(self, media_id, caption):
-        url = f"https://graph.facebook.com/v17.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={media_id}"
+        url = f"https://graph.facebook.com/v18.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={media_id}"
         response = requests.post(url)
 
         if response.status_code == 200:
@@ -52,7 +52,7 @@ class InstagramApiHelper:
         default_image_url = "https://www.nasa.gov/sites/default/files/styles/side_image/public/thumbnails/image/apod_logo.png?itok=6It-nhCr"
         caption += "\nToday's APOD is not supported by Instagram 😞"
         post_id = self.create_media_id(default_image_url, caption)
-        url = f"https://graph.facebook.com/v17.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={post_id}"
+        url = f"https://graph.facebook.com/v18.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={post_id}"
         response = requests.post(url)
         if response.status_code == 200:
             return "Image posted successfully!"
