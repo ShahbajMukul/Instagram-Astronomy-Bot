@@ -1,0 +1,64 @@
+name: Daily Instagram APOD
+
+on:
+  schedule:
+    - cron: "00 20 * * *"
+      timezone: "America/New_York"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-instagram-apod
+  cancel-in-progress: false
+
+jobs:
+  post-apod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Instagram Astronomy Bot
+        env:
+          NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_SYSTEM_PROMPT: ${{ secrets.GEMINI_SYSTEM_PROMPT }}
+          INSTAGRAM_ID: ${{ secrets.INSTAGRAM_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: python main.py
+
+      - name: Save posting history
+        if: always()
+        run: |
+          if [ -f posted_dates.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            git add posted_dates.txt
+
+            if ! git diff --cached --quiet; then
+              git commit -m "Record APOD post"
+              git push
+            fi
+          fi
