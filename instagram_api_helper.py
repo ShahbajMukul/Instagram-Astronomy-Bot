@@ -1,8 +1,8 @@
-
 import requests
 import json
 import os
 from dotenv import load_dotenv
+from io import BytesIO  
 load_dotenv()
 
 instagram_id = os.getenv("INSTAGRAM_ID")
@@ -28,46 +28,164 @@ class InstagramApiHelper:
                 caption = f"{title}\n\n{explanation}\n\n{date}"
         return caption
 
-
     def create_media_id(self, image_hd_url, image_url, caption):
-        url = f"https://graph.facebook.com/v21.0/{instagram_id}/media?image_url={image_hd_url}&access_token={instagram_access_token}&caption={caption}"
-        response = requests.post(url)
-        data = json.loads(response.text)
+        url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/media"
+        params = {
+            "image_url": image_hd_url,
+            "access_token": self.access_token,
+            "caption": caption
+        }
+        response = requests.post(url, params=params)
+        data = response.json()
         if "id" in data:
-            print("Media ID created for instagram. Trying to post...")
+            print("Media ID created for instagram. Waiting for container to be ready...")
             return data["id"]
         elif response.status_code == 400:
-            url=f"https://graph.facebook.com/v21.0/{instagram_id}/media?image_url={image_url}&access_token={instagram_access_token}&caption={caption}"
-            response = requests.post(url)
-            data = json.loads(response.text)
-            return "hd_image failed, attempted regular image to be posted"
-        elif "error" in data:
-            print("Error from create_media_id: " + data["error"]["message"] + "\n")
-            return "Something went wrong. Check the Error:" + data["error"]["message"] + "\n"
+            print("HD image failed, attempting regular image...")
+            params["image_url"] = image_url
+            response = requests.post(url, params=params)
+            data = response.json()
+            if "id" in data:
+                return data["id"]
+            else:
+                raise Exception(f"Failed to create media id with regular image: {data.get('error', {}).get('message')}")
         else:
-            return "Limit reached"
+            raise Exception(f"Failed to create media id: {data.get('error', {}).get('message', 'Unknown error')}")
         
 
     def publish_media(self, media_id, caption):
-        url = f"https://graph.facebook.com/v21.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={media_id}"
-        response = requests.post(url)
+        # Wait for the container to be ready
+        import time
+        attempts = 0
+        max_attempts = 12
+        while attempts < max_attempts:
+            status = self.check_container_status(media_id)
+            if status == "FINISHED" or status == "PUBLISHED" or status == "ERROR":
+                break
+            elif status == "IN_PROGRESS":
+                print("Image container is still processing...")
+            attempts += 1
+            time.sleep(10)
+            
+        url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/media_publish"
+        params = {
+            "access_token": self.access_token,
+            "creation_id": media_id
+        }
+        response = requests.post(url, params=params)
 
         if response.status_code == 200:
             return "Image posted successfully!"
-        elif response.status_code == 400:
-            return self.post_default_image(caption)
         else:
-            return f"Something went wrong while posting the image! Status code: {response.status_code}. Response: {response.text}"
-
+            raise Exception(f"Something went wrong while posting the image! Status code: {response.status_code}. Response: {response.text}")
     def post_default_image(self, caption):
         print("\nPosting default image... \n")
         default_image_url = "https://www.nasa.gov/sites/default/files/styles/side_image/public/thumbnails/image/apod_logo.png?itok=6It-nhCr"
         caption += "\nToday's APOD is not supported by Instagram 😞"
         post_id = self.create_media_id(default_image_url, default_image_url, caption)
-        url = f"https://graph.facebook.com/v19.0/{instagram_id}/media_publish?access_token={instagram_access_token}&creation_id={post_id}"
-        response = requests.post(url)
-        if response.status_code == 200:
-            return "Image posted successfully!"
-        else:
-            return f"Something went wrong while posting the image! Status code: {response.status_code}. Response: {response.text}"
-    
+        return self.publish_media(post_id, caption)
+
+    def create_reel_container(self, video_path, caption, thumbnail_url=None):
+        """Create a container for a reel upload using the container-based approach"""
+        url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/video_reels"
+        
+        # Upload video file directly in the request
+        try:
+            with open(video_path, 'rb') as video_file:
+                files = {
+                    'video_file': ('reel.mp4', video_file, 'video/mp4'),
+                }
+                params = {
+                    'access_token': self.access_token,
+                    'caption': caption,
+                    'media_type': 'REELS',
+                }
+                if thumbnail_url:
+                    params['thumbnail_url'] = thumbnail_url
+
+                response = requests.post(url, files=files, params=params)
+                data = json.loads(response.text)
+                
+                if "id" not in data:
+                    print(f"Error creating container: {data.get('error', {}).get('message', 'Unknown error')}")
+                    return None
+                    
+                return data['id']
+                    
+        except Exception as e:
+            print(f"Error uploading video file: {str(e)}")
+            return None
+
+    def check_container_status(self, container_id):
+        """Check the status of a media container"""
+        url = f"https://graph.facebook.com/v26.0/{container_id}?fields=status_code,status&access_token={self.access_token}"
+        response = requests.get(url)
+        data = json.loads(response.text)
+        
+        if 'error' in data:
+            print(f"Error checking reel status: {data['error']['message']}")
+            return 'ERROR'
+            
+        status_code = data.get('status_code', '')
+        status_message = data.get('status', '')
+        print(f"Reel status: {status_code} - {status_message}")
+        
+        if 'Error:' in str(status_message):
+            if '2207026' in str(status_message):
+                print("Video format error: Please ensure the video meets Instagram requirements:")
+                print("- Format: MP4 (preferred)")
+                print("- Length: 3-90 seconds")
+                print("- Size: Maximum 4GB")
+                print("- Aspect ratio: 9:16 (portrait)")
+                print("- Resolution: Minimum 720 pixels width")
+                print("- Codec: H.264")
+                print("- Frame rate: 30fps (recommended)")
+            return 'ERROR'
+        
+        return status_code
+
+    def publish_reel(self, container_id):
+        """Publish a reel after it has been uploaded and processed"""
+        url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/media_publish"
+        params = {
+            'creation_id': container_id,
+            'access_token': self.access_token
+        }
+        response = requests.post(url, params=params)
+        data = json.loads(response.text)
+
+        if "id" in data:
+            return f"Reel published successfully! ID: {data['id']}"
+        elif "error" in data:
+            return f"Error publishing reel: {data['error']['message']}"
+        return "Unknown error occurred while publishing reel"
+
+    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=2):
+        """Complete process to post a reel including creation, status checking, and publishing"""
+        print(f"Starting reel upload process from URL: {video_path}")
+        container_id = self.create_reel_container(video_path, caption, thumbnail_url)
+        if not container_id:
+            return "Failed to create reel container"
+
+        import time
+        attempts = 0
+        while attempts < max_attempts:
+            print(f"Checking reel status (attempt {attempts + 1}/{max_attempts})")
+            status = self.check_container_status(container_id)
+            
+            if status == "FINISHED" or status == "ERROR":
+                print("Video processing completed successfully")
+                return self.publish_reel(container_id)
+
+            elif status == "IN_PROGRESS":
+                print("Video is still processing...")
+            elif status == "PUBLISHED":
+                return "Reel already published"
+            
+            attempts += 1
+            wait_time = 10  # Increased wait time between checks
+            print(f"Waiting {wait_time} seconds before next status check...")
+            time.sleep(wait_time)
+
+        return "Timeout waiting for video processing. The video may still be processing in the background."
+
