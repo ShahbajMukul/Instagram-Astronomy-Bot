@@ -2,8 +2,7 @@ name: Daily Instagram APOD
 
 on:
   schedule:
-    - cron: "00 20 * * *"
-      timezone: "America/New_York"
+    - cron: "0 20 * * *"
 
   workflow_dispatch:
 
@@ -46,6 +45,10 @@ jobs:
           GEMINI_SYSTEM_PROMPT: ${{ secrets.GEMINI_SYSTEM_PROMPT }}
           INSTAGRAM_ID: ${{ secrets.INSTAGRAM_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          CARTESIA_KEY: ${{ secrets.CARTESIA_KEY }}
+          CARTESIA_MODEL: ${{ secrets.CARTESIA_MODEL }}
+          MUSIC_DIR: music
+          MUSIC_VOLUME: "0.12"
         run: python main.py
 
       - name: Save posting history
