@@ -137,6 +137,7 @@ class InstagramApiHelper:
                         "Authorization": f"OAuth {self.access_token}",
                         "offset": "0",
                         "file_size": str(file_size),
+                        "Content-Length": str(file_size),
                         "Content-Type": "application/octet-stream",
                     }
                     if os.path.exists(video_path):
@@ -144,7 +145,11 @@ class InstagramApiHelper:
                             upload_response = requests.post(upload_uri, headers=upload_headers, data=video_file)
                         upload_data = upload_response.json()
                         if upload_response.status_code != 200 or not upload_data.get("success", True):
-                            print(f"Error uploading video content: {upload_response.text}")
+                            print(
+                                "Error uploading video content: "
+                                f"HTTP {upload_response.status_code} "
+                                f"{upload_response.text}"
+                            )
                             return None
 
                 return container_id

@@ -54,20 +54,7 @@ def work():
     instagram_helper = InstagramApiHelper()
     caption = instagram_helper.write_caption(title, image_by, date, explanation)
     
-    # Post the image (can be disabled via POST_IMAGE=false if only reels are desired)
-    post_image = os.getenv("POST_IMAGE", "false").lower() in ("true", "1", "yes")
-    if post_image:
-        try:
-            print("Posting image to Instagram...")
-            media_id = instagram_helper.create_media_id(image_hd_url, image_url, caption)
-            result = instagram_helper.publish_media(media_id, caption)
-            print("\n" + result + "\n")
-        except Exception as e:
-            print(f"Failed to post image, attempting fallback. Error: {str(e)}")
-            result = instagram_helper.post_default_image(caption)
-            print("\n" + result + "\n")
-
-    # Then create and post the reel using Gemini response as TTS and raw APOD caption for caption
+    # Create and post the reel first; the image is the fallback if reel posting fails.
     print("Creating reel from APOD content...")
     reel_generator = ReelGenerator()
     
@@ -83,6 +70,13 @@ def work():
             caption=caption
         )
         print("\n" + reel_result + "\n")
+
+        reel_succeeded = reel_result.startswith((
+            "Reel published successfully",
+            "Reel already published",
+        ))
+        if not reel_succeeded:
+            raise RuntimeError(f"Reel posting failed: {reel_result}")
         
         # Clean up temporary file
         if os.path.exists(video_path):
@@ -93,7 +87,14 @@ def work():
         # Ensure cleanup of temporary file in case of error
         if 'video_path' in locals() and os.path.exists(video_path):
             os.remove(video_path)
-        raise e
+        print("Posting the APOD image as a fallback...")
+        try:
+            media_id = instagram_helper.create_media_id(image_hd_url, image_url, caption)
+            result = instagram_helper.publish_media(media_id, caption)
+        except Exception as image_error:
+            print(f"Primary image fallback failed: {image_error}")
+            result = instagram_helper.post_default_image(caption)
+        print("\n" + result + "\n")
         
     # Record successful post
     with open(posted_dates_file, "a") as f:

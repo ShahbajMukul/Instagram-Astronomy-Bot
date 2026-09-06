@@ -67,6 +67,27 @@ class TestInstagramApiHelper(unittest.TestCase):
         container_id = self.insta.create_reel_container("dummy.mp4", "caption")
         self.assertEqual(container_id, "67890")
 
+    @patch('instagram_api_helper.requests.post')
+    @patch('instagram_api_helper.os.path.exists', return_value=True)
+    @patch('instagram_api_helper.os.path.getsize', return_value=1234)
+    @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data=b'video')
+    def test_create_reel_container_reports_upload_failure(
+        self, mock_open, mock_getsize, mock_exists, mock_post
+    ):
+        init_response = MagicMock()
+        init_response.json.return_value = {"id": "67890", "uri": "upload-url"}
+        upload_response = MagicMock()
+        upload_response.status_code = 400
+        upload_response.text = '{"error":"processing failed"}'
+        upload_response.json.return_value = {"error": "processing failed"}
+        mock_post.side_effect = [init_response, upload_response]
+
+        container_id = self.insta.create_reel_container("dummy.mp4", "caption")
+
+        self.assertIsNone(container_id)
+        upload_headers = mock_post.call_args_list[1].kwargs["headers"]
+        self.assertEqual(upload_headers["Content-Length"], "1234")
+
     @patch('instagram_api_helper.InstagramApiHelper.publish_reel')
     @patch('instagram_api_helper.InstagramApiHelper.check_container_status')
     @patch('instagram_api_helper.InstagramApiHelper.create_reel_container')
