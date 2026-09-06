@@ -2,6 +2,7 @@ from datetime import datetime
 from gemini_processing import GeminiProcessing
 from apod_api_helper import ApodApiHelper
 from instagram_api_helper import InstagramApiHelper
+from reel_generator import ReelGenerator
 from io import BytesIO
 import requests
 import os
@@ -62,7 +63,7 @@ def work():
         print(f"Failed to post image, attempting fallback. Error: {str(e)}")
         result = instagram_helper.post_default_image(caption)
         print("\n" + result + "\n")
-""" 
+
     # Then create and post the reel
     print("Creating reel from APOD content...")
     reel_generator = ReelGenerator()
@@ -94,22 +95,22 @@ def work():
     # Record successful post
     with open(posted_dates_file, "a") as f:
         f.write(date_str + "\n")
-    print("Idempotency recorded. Done.") """
+    print("Idempotency recorded. Done.")
 
-""" def reel_test():
+def reel_test():
     print('\n' + "Working" + '\n')
     print("Current time: " + datetime.now().strftime("%H:%M:%S") + "\n")
 
     reel_generator = ReelGenerator()
     image_url = "https://apod.nasa.gov/apod/image/2502/SaturnIR_CassiniKakitsev_960.jpg"
-    description = This infrared mosaic from the Cassini spacecraft shows Saturn's northern hemisphere in a light that is not visible to human eyes. The image was taken in 2006 and shows the gas giant's rings, as well as the hexagonal storm at its north pole. The storm is a persistent feature of the planet's atmosphere and has been observed for decades. The image was created using data from Cassini's visual and infrared mapping spectrometer, which can detect light at wavelengths beyond the visible spectrum. The false-color image was created by assigning visible colors to the infrared data, with red representing low clouds and green representing high clouds. The hexagonal storm is visible as a dark spot at the planet's north pole.
+    description = """This infrared mosaic from the Cassini spacecraft shows Saturn's northern hemisphere in a light that is not visible to human eyes. The image was taken in 2006 and shows the gas giant's rings, as well as the hexagonal storm at its north pole. The storm is a persistent feature of the planet's atmosphere and has been observed for decades. The image was created using data from Cassini's visual and infrared mapping spectrometer, which can detect light at wavelengths beyond the visible spectrum. The false-color image was created by assigning visible colors to the infrared data, with red representing low clouds and green representing high clouds. The hexagonal storm is visible as a dark spot at the planet's north pole."""
     try:
         video_path = reel_generator.create_reel(image_url, description)
         
-        # Upload video file to Instagram - changed video_url to video_path
+        # Upload video file to Instagram
         instagram_helper = InstagramApiHelper()
         reel_result = instagram_helper.post_reel(
-            video_path=video_path,  # Changed from video_url to video_path
+            video_path=video_path,
             caption=f"\n\n{description}"
         )
         print("\n" + reel_result + "\n")
@@ -124,11 +125,5 @@ def work():
         if 'video_path' in locals() and os.path.exists(video_path):
             os.remove(video_path)
 
-    
-# For testing purpose
 if __name__ == "__main__":
     reel_test()
-
- """
-
-work()

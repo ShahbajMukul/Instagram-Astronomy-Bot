@@ -2,7 +2,7 @@ import os
 import re
 import tempfile
 import numpy
-from google.cloud import texttospeech
+from gtts import gTTS
 from moviepy import ImageClip, AudioFileClip, CompositeVideoClip
 from PIL import Image
 import requests
@@ -10,72 +10,25 @@ from io import BytesIO
 
 class ReelGenerator:
     def __init__(self):
-        # Initialize Google Cloud TTS client
-        self.tts_client = texttospeech.TextToSpeechClient()
-
-    def sanitize_text(self, text):
-        """Remove emojis, special characters and format text for SSML"""
-        # Remove emojis and special characters
-        emoji_pattern = re.compile("[" 
-            u"\U0001F600-\U0001F64F"  # emoticons
-            u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-            u"\U0001F680-\U0001F6FF"  # transport & map symbols
-            u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-            u"\U00002702-\U000027B0"
-            u"\U000024C2-\U0001F251"
-            "]+", flags=re.UNICODE)
-        
-        text = emoji_pattern.sub(r'', text)
-        # Remove newlines and multiple spaces
-        text = ' '.join(text.split())
-        # Remove any remaining special characters
-        text = re.sub(r'[^\w\s.,!?-]', '', text)
-        
-        # Format as SSML
-        ssml = f'''<speak>
-            <prosody rate="0.95" pitch="+0.5st">
-                {text}
-            </prosody>
-        </speak>'''
-        
-        return ssml
+        pass
 
     def generate_speech(self, text):
-        """Generate speech from text using Google Cloud SSML"""
-        # Sanitize and format text as SSML
-        ssml_text = self.sanitize_text(text)
+        """Generate speech directly using gTTS"""
+        # Remove unsupported symbols while preserving words and basic punctuation
+        clean_text = re.sub(r"[^\w\s.,!?'\":;\-()]", '', text)
+        clean_text = ' '.join(clean_text.split())
         
-        synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
-
-        voice = texttospeech.VoiceSelectionParams(
-            language_code="en-US",
-            name="en-US-Neural2-D",
-            ssml_gender=texttospeech.SsmlVoiceGender.MALE
-        )
-
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=1.0
-        )
-
-        response = self.tts_client.synthesize_speech(
-            input=synthesis_input, voice=voice, audio_config=audio_config
-        )
-
-        # Save audio to temporary file
-        temp_audio = BytesIO(response.audio_content)
+        tts = gTTS(text=clean_text, lang='en')
+        temp_audio = BytesIO()
+        tts.write_to_fp(temp_audio)
         temp_audio.seek(0)
-
-        # test save the audio to a file
-        with open('temp_audio.mp3', 'wb') as f:
-            f.write(temp_audio.read())
-
         return temp_audio
 
     def create_reel(self, image_url, text, max_duration=60):
         """Create a reel from image and text"""
         # Download image
-        response = requests.get(image_url)
+        response = requests.get(image_url, timeout=30)
+        response.raise_for_status()
         image_data = BytesIO(response.content)
         
         # Generate audio from text and save to temp file
@@ -122,33 +75,33 @@ class ReelGenerator:
             paste_y = (target_height - new_height) // 2
             background.paste(resized_image, (paste_x, paste_y))
             
-            # Save the processed image
-            temp_image = BytesIO()
-            background.save(temp_image, format='PNG')
-            temp_image.seek(0)
-            
-            # Load audio
+            # Load audio and determine duration
             audio_clip = AudioFileClip(temp_audio_path)
             duration = min(audio_clip.duration, max_duration)
-            audio_clip.close()  
-            # Create video clip from processed image
-            image_clip = ImageClip(numpy.array(background), duration=duration)
+            if audio_clip.duration > max_duration:
+                audio_clip = audio_clip.subclipped(0, max_duration)
+
+            # Create video clip from processed image and attach audio
+            image_clip = ImageClip(numpy.array(background)).with_duration(duration)
+            video = image_clip.with_audio(audio_clip)
             
-            # Set audio
-            video = CompositeVideoClip([image_clip])
-            
-            # Write to file with Instagram-compatible settings
+            # Write to file with Instagram-compatible settings (30 fps, H.264 + AAC)
             video.write_videofile(
                 temp_video_path,
                 codec='libx264',
                 audio_codec='aac',
-                temp_audiofile=None,
-                remove_temp=True,
-                fps=1,
+                fps=30,
                 bitrate='4000k',
                 preset='medium'
             )
             
+            audio_clip.close()
+            video.close()
+
+            # Clean up temp audio file
+            if os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+
             return temp_video_path
             
         except Exception as e:
@@ -158,7 +111,3 @@ class ReelGenerator:
             if os.path.exists(temp_audio_path):
                 os.remove(temp_audio_path)
             raise
-        finally:
-            # Clean up temporary audio file
-            if os.path.exists(temp_audio_path):
-                os.remove(temp_audio_path)

@@ -86,32 +86,67 @@ class InstagramApiHelper:
         return self.publish_media(post_id, caption)
 
     def create_reel_container(self, video_path, caption, thumbnail_url=None):
-        """Create a container for a reel upload using the container-based approach"""
-        url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/video_reels"
+        """Create a container for a reel upload using Instagram Graph API"""
+        url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/media"
         
-        # Upload video file directly in the request
         try:
-            with open(video_path, 'rb') as video_file:
-                files = {
-                    'video_file': ('reel.mp4', video_file, 'video/mp4'),
-                }
+            # Check if video_path is a remote URL or local file path
+            if video_path.startswith("http://") or video_path.startswith("https://"):
                 params = {
-                    'access_token': self.access_token,
-                    'caption': caption,
-                    'media_type': 'REELS',
+                    "access_token": self.access_token,
+                    "caption": caption,
+                    "media_type": "REELS",
+                    "video_url": video_path,
                 }
                 if thumbnail_url:
-                    params['thumbnail_url'] = thumbnail_url
-
-                response = requests.post(url, files=files, params=params)
-                data = json.loads(response.text)
+                    params["thumbnail_url"] = thumbnail_url
                 
+                response = requests.post(url, params=params)
+                data = response.json()
                 if "id" not in data:
-                    print(f"Error creating container: {data.get('error', {}).get('message', 'Unknown error')}")
+                    print(f"Error creating reel container: {data.get('error', {}).get('message', 'Unknown error')}")
                     return None
-                    
-                return data['id']
-                    
+                return data["id"]
+
+            else:
+                # Resumable upload for local video file
+                file_size = os.path.getsize(video_path) if os.path.exists(video_path) else 0
+                params = {
+                    "access_token": self.access_token,
+                    "caption": caption,
+                    "media_type": "REELS",
+                    "upload_type": "resumable",
+                }
+                if thumbnail_url:
+                    params["thumbnail_url"] = thumbnail_url
+
+                response = requests.post(url, params=params)
+                data = response.json()
+
+                if "id" not in data:
+                    print(f"Error initializing reel container: {data.get('error', {}).get('message', 'Unknown error')}")
+                    return None
+
+                container_id = data["id"]
+                upload_uri = data.get("uri")
+
+                if upload_uri:
+                    upload_headers = {
+                        "Authorization": f"OAuth {self.access_token}",
+                        "offset": "0",
+                        "file_size": str(file_size),
+                        "Content-Type": "application/octet-stream",
+                    }
+                    if os.path.exists(video_path):
+                        with open(video_path, "rb") as video_file:
+                            upload_response = requests.post(upload_uri, headers=upload_headers, data=video_file)
+                        upload_data = upload_response.json()
+                        if upload_response.status_code != 200 or not upload_data.get("success", True):
+                            print(f"Error uploading video content: {upload_response.text}")
+                            return None
+
+                return container_id
+
         except Exception as e:
             print(f"Error uploading video file: {str(e)}")
             return None

@@ -73,6 +73,9 @@ class GeminiProcessing:
                 continue
 
             for part in content.parts or []:
+                if getattr(part, "thought", False):
+                    continue
+
                 part_text = getattr(part, "text", None)
 
                 if part_text:
@@ -90,13 +93,33 @@ class GeminiProcessing:
         """
         text = html.unescape(text)
 
-        # Remove common Markdown formatting.
-        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
-        text = re.sub(r"[*_`#]", "", text)
+        # Strip code fence markers without deleting text inside code blocks
+        text = re.sub(r"```[a-zA-Z]*", "", text)
 
-        # Normalize whitespace while retaining paragraph separation.
+        # Convert HTML line breaks and paragraph tags to newlines
+        text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+        text = re.sub(r"(?i)</p>", "\n\n", text)
+        text = re.sub(r"(?i)<p[^>]*>", "", text)
+
+        # Strip remaining HTML tags
+        text = re.sub(r"<[^>]+>", "", text)
+
+        # Convert markdown links [text](url) -> text
+        text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+
+        # Remove line-starting markdown headers (e.g. # Header or ## Header)
+        text = re.sub(r"(?m)^#{1,6}\s*", "", text)
+
+        # Remove bold/italic markers (*, _, `) while preserving text
+        text = re.sub(r"[*_`]", "", text)
+
+        # Remove bullet markers at start of lines (*, -, +)
+        text = re.sub(r"(?m)^[ \t]*[*+\-]\s+", "", text)
+
+        # Normalize line endings and whitespace per line while retaining paragraph breaks
         text = text.replace("\r\n", "\n").replace("\r", "\n")
-        text = re.sub(r"[ \t]+", " ", text)
+        lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.split("\n")]
+        text = "\n".join(lines)
         text = re.sub(r"\n{3,}", "\n\n", text)
 
         return text.strip()
@@ -140,7 +163,7 @@ class GeminiProcessing:
                 config=types.GenerateContentConfig(
                     temperature=0.7,
                     top_p=0.9,
-                    max_output_tokens=700,
+                    max_output_tokens=1500,
                     response_mime_type="text/plain",
                     safety_settings=[
                         types.SafetySetting(

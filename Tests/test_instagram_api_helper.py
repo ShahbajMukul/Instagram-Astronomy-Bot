@@ -52,7 +52,7 @@ class TestInstagramApiHelper(unittest.TestCase):
     @patch('instagram_api_helper.requests.post')
     def test_create_reel_container(self, mock_post, mock_open):
         mock_response = MagicMock()
-        mock_response.text = '{"id": "67890"}'
+        mock_response.json.return_value = {"id": "67890"}
         mock_post.return_value = mock_response
         
         container_id = self.insta.create_reel_container("dummy.mp4", "caption")
