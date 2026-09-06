@@ -12,10 +12,26 @@ class ReelGenerator:
     def __init__(self):
         pass
 
+    @staticmethod
+    def prepare_tts_text(text: str, max_chars: int = 1100) -> str:
+        """Strip URLs/hashtags and trim cleanly at sentence end for natural speech."""
+        clean = re.sub(r'https?://\S+', '', text)
+        clean = re.sub(r'#\w+', '', clean).strip()
+        if len(clean) <= max_chars:
+            return clean
+        truncated = clean[:max_chars]
+        last_punct = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
+        if last_punct > 300:
+            return truncated[:last_punct + 1].strip()
+        return truncated.rsplit(' ', 1)[0].strip() + '.'
+
     def generate_speech(self, text):
         """Generate speech directly using gTTS"""
+        # Remove URLs and hashtags
+        clean_text = re.sub(r'https?://\S+', '', text)
+        clean_text = re.sub(r'#\w+', '', clean_text)
         # Remove unsupported symbols while preserving words and basic punctuation
-        clean_text = re.sub(r"[^\w\s.,!?'\":;\-()]", '', text)
+        clean_text = re.sub(r"[^\w\s.,!?'\":;\-()]", '', clean_text)
         clean_text = ' '.join(clean_text.split())
         
         tts = gTTS(text=clean_text, lang='en')
@@ -24,7 +40,7 @@ class ReelGenerator:
         temp_audio.seek(0)
         return temp_audio
 
-    def create_reel(self, image_url, text, max_duration=60):
+    def create_reel(self, image_url, text, max_duration=90):
         """Create a reel from image and text"""
         # Download image
         response = requests.get(image_url, timeout=30)

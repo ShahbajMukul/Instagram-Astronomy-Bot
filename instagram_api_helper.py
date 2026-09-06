@@ -26,6 +26,8 @@ class InstagramApiHelper:
                 caption = f"{title}\n\n{explanation}\n\nImage Credit: {image_by}\n{date}"
             else:
                 caption = f"{title}\n\n{explanation}\n\n{date}"
+        if len(caption) > 2200:
+            caption = caption[:2197] + "..."
         return caption
 
     def create_media_id(self, image_hd_url, image_url, caption):

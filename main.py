@@ -46,38 +46,41 @@ def work():
     
     print("Data received from NASA. Processing data...")
     
-    # Generate AI description
+    # Generate AI description for TTS voiceover narration
     bot = GeminiProcessing()
     bot_says = bot.generate_content(explanation, image_url)
 
-    # Create Instagram post
+    # Format Instagram caption using the raw NASA APOD explanation
     instagram_helper = InstagramApiHelper()
-    caption = instagram_helper.write_caption(title, image_by, date, bot_says)
+    caption = instagram_helper.write_caption(title, image_by, date, explanation)
     
-    # First post the image
-    try:
-        media_id = instagram_helper.create_media_id(image_hd_url, image_url, caption)
-        result = instagram_helper.publish_media(media_id, caption)
-        print("\n" + result + "\n")
-    except Exception as e:
-        print(f"Failed to post image, attempting fallback. Error: {str(e)}")
-        result = instagram_helper.post_default_image(caption)
-        print("\n" + result + "\n")
+    # Post the image (can be disabled via POST_IMAGE=false if only reels are desired)
+    post_image = os.getenv("POST_IMAGE", "false").lower() in ("true", "1", "yes")
+    if post_image:
+        try:
+            print("Posting image to Instagram...")
+            media_id = instagram_helper.create_media_id(image_hd_url, image_url, caption)
+            result = instagram_helper.publish_media(media_id, caption)
+            print("\n" + result + "\n")
+        except Exception as e:
+            print(f"Failed to post image, attempting fallback. Error: {str(e)}")
+            result = instagram_helper.post_default_image(caption)
+            print("\n" + result + "\n")
 
-    # Then create and post the reel
+    # Then create and post the reel using Gemini response as TTS and raw APOD caption for caption
     print("Creating reel from APOD content...")
     reel_generator = ReelGenerator()
     
-    # Use a shortened version of the bot's response for the audio
-    short_description = bot_says[:500] if len(bot_says) > 500 else bot_says
+    # Prepare Gemini response for TTS narration (clean URLs/hashtags, sentence boundary trim)
+    tts_text = reel_generator.prepare_tts_text(bot_says)
     
     try:
-        video_path = reel_generator.create_reel(image_url, short_description)
+        video_path = reel_generator.create_reel(image_url, tts_text)
         
-        # Upload video file to Instagram
+        # Upload video file to Instagram with raw APOD caption
         reel_result = instagram_helper.post_reel(
             video_path=video_path,
-            caption=f"{title}\n\n{short_description}\n\nCredits: {image_by if image_by else 'NASA'}\n{date}"
+            caption=caption
         )
         print("\n" + reel_result + "\n")
         
@@ -126,4 +129,4 @@ def reel_test():
             os.remove(video_path)
 
 if __name__ == "__main__":
-    reel_test()
+    work()

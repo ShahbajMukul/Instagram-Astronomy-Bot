@@ -19,6 +19,15 @@ class TestInstagramApiHelper(unittest.TestCase):
         actual_caption = self.insta.write_caption(title, image_by, date, explanation)
         self.assertEqual(actual_caption, expected_caption)
 
+    def test_write_caption_truncation(self):
+        title = "Short Title"
+        image_by = "Credit"
+        date = "01/01/2026"
+        explanation = "A" * 3000
+        actual_caption = self.insta.write_caption(title, image_by, date, explanation)
+        self.assertLessEqual(len(actual_caption), 2200)
+        self.assertTrue(actual_caption.endswith("..."))
+
     @patch('instagram_api_helper.requests.post')
     def test_create_media_id_success(self, mock_post):
         mock_response = MagicMock()
