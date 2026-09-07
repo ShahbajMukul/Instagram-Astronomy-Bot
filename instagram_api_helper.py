@@ -15,8 +15,8 @@ instagram_access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 class InstagramApiHelper:
     def __init__(self):
         load_dotenv()
-        self.instagram_id = os.getenv("INSTAGRAM_ID")
-        self.access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+        self.instagram_id = (os.getenv("INSTAGRAM_ID") or "").strip()
+        self.access_token = (os.getenv("INSTAGRAM_ACCESS_TOKEN") or "").strip()
 
     def write_caption(self, title, image_by, date, explanation):
 
@@ -304,4 +304,3 @@ class InstagramApiHelper:
             time.sleep(wait_time)
 
         return "Timeout waiting for video processing. The video may still be processing in the background."
-
