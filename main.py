@@ -6,6 +6,13 @@ from reel_generator import ReelGenerator
 from io import BytesIO
 import requests
 import os
+import logging
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 def work():
     print('\n' + "Working" + '\n')
@@ -54,15 +61,17 @@ def work():
     instagram_helper = InstagramApiHelper()
     caption = instagram_helper.write_caption(title, image_by, date, explanation)
     
-    # Create and post the reel first; the image is the fallback if reel posting fails.
+    # Create and post the reel; fall back to an image if reel posting fails.
     print("Creating reel from APOD content...")
     reel_generator = ReelGenerator()
     
     # Prepare Gemini response for TTS narration (clean URLs/hashtags, sentence boundary trim)
     tts_text = reel_generator.prepare_tts_text(bot_says)
     
+    video_path = None
     try:
         video_path = reel_generator.create_reel(image_url, tts_text)
+        logger.info("REEL: generated video retained at %s", video_path)
         
         # Upload video file to Instagram with raw APOD caption
         reel_result = instagram_helper.post_reel(
@@ -78,25 +87,35 @@ def work():
         if not reel_succeeded:
             raise RuntimeError(f"Reel posting failed: {reel_result}")
         
-        # Clean up temporary file
+        # Clean up only after a confirmed successful publish.
         if os.path.exists(video_path):
             os.remove(video_path)
             
     except Exception as e:
-        print(f"Error creating/posting reel: {str(e)}")
-        # Ensure cleanup of temporary file in case of error
-        if 'video_path' in locals() and os.path.exists(video_path):
+        logger.exception("REEL FAILED: %s", e)
+        if video_path and os.path.exists(video_path):
+            logger.error(
+                "REEL DEBUG: failed video preserved at %s (%d bytes)",
+                video_path,
+                os.path.getsize(video_path),
+            )
             os.remove(video_path)
-        print("Posting the APOD image as a fallback...")
+
+        logger.info("IMAGE FALLBACK: posting the APOD image")
         try:
-            media_id = instagram_helper.create_media_id(image_hd_url, image_url, caption)
-            result = instagram_helper.publish_media(media_id, caption)
+            media_id = instagram_helper.create_media_id(
+                image_hd_url,
+                image_url,
+                caption,
+            )
+            fallback_result = instagram_helper.publish_media(media_id, caption)
         except Exception as image_error:
-            print(f"Primary image fallback failed: {image_error}")
-            result = instagram_helper.post_default_image(caption)
-        print("\n" + result + "\n")
-        
-    # Record successful post
+            logger.exception("IMAGE FALLBACK: primary image failed: %s", image_error)
+            fallback_result = instagram_helper.post_default_image(caption)
+
+        logger.info("IMAGE FALLBACK: %s", fallback_result)
+
+    # Record the date after either a confirmed reel or image fallback succeeds.
     with open(posted_dates_file, "a") as f:
         f.write(date_str + "\n")
     print("Idempotency recorded. Done.")

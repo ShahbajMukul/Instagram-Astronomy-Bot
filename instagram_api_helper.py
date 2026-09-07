@@ -1,9 +1,13 @@
 import requests
 import json
 import os
+import logging
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 from io import BytesIO  
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 instagram_id = os.getenv("INSTAGRAM_ID")
 instagram_access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
@@ -92,6 +96,7 @@ class InstagramApiHelper:
         url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/media"
         
         try:
+            logger.info("REEL 1/4: preparing upload for %s", video_path)
             # Check if video_path is a remote URL or local file path
             if video_path.startswith("http://") or video_path.startswith("https://"):
                 params = {
@@ -106,13 +111,31 @@ class InstagramApiHelper:
                 response = requests.post(url, params=params)
                 data = response.json()
                 if "id" not in data:
-                    print(f"Error creating reel container: {data.get('error', {}).get('message', 'Unknown error')}")
+                    logger.error(
+                        "REEL 2/4 FAILED: remote container HTTP %s: %s",
+                        response.status_code,
+                        data,
+                    )
                     return None
+                logger.info("REEL 2/4: remote container created: %s", data["id"])
                 return data["id"]
 
             else:
                 # Resumable upload for local video file
-                file_size = os.path.getsize(video_path) if os.path.exists(video_path) else 0
+                if not os.path.exists(video_path):
+                    logger.error("REEL 1/4 FAILED: video file does not exist: %s", video_path)
+                    return None
+
+                file_size = os.path.getsize(video_path)
+                if file_size == 0:
+                    logger.error("REEL 1/4 FAILED: video file is empty: %s", video_path)
+                    return None
+
+                logger.info(
+                    "REEL 1/4: local MP4 is ready (%d bytes, %.2f MB)",
+                    file_size,
+                    file_size / 1024 / 1024,
+                )
                 params = {
                     "access_token": self.access_token,
                     "caption": caption,
@@ -126,36 +149,65 @@ class InstagramApiHelper:
                 data = response.json()
 
                 if "id" not in data:
-                    print(f"Error initializing reel container: {data.get('error', {}).get('message', 'Unknown error')}")
+                    logger.error(
+                        "REEL 2/4 FAILED: container initialization HTTP %s: %s",
+                        response.status_code,
+                        data,
+                    )
                     return None
 
                 container_id = data["id"]
                 upload_uri = data.get("uri")
+                logger.info(
+                    "REEL 2/4: container initialized id=%s upload_uri_received=%s",
+                    container_id,
+                    bool(upload_uri),
+                )
 
-                if upload_uri:
-                    upload_headers = {
-                        "Authorization": f"OAuth {self.access_token}",
-                        "offset": "0",
-                        "file_size": str(file_size),
-                        "Content-Length": str(file_size),
-                        "Content-Type": "application/octet-stream",
-                    }
-                    if os.path.exists(video_path):
-                        with open(video_path, "rb") as video_file:
-                            upload_response = requests.post(upload_uri, headers=upload_headers, data=video_file)
-                        upload_data = upload_response.json()
-                        if upload_response.status_code != 200 or not upload_data.get("success", True):
-                            print(
-                                "Error uploading video content: "
-                                f"HTTP {upload_response.status_code} "
-                                f"{upload_response.text}"
-                            )
-                            return None
+                if not upload_uri:
+                    logger.error("REEL 3/4 FAILED: container response did not include upload URI")
+                    return None
+
+                upload_url = urlparse(upload_uri)
+                logger.info(
+                    "REEL 3/4: upload endpoint host=%s path=%s",
+                    upload_url.netloc,
+                    upload_url.path,
+                )
+
+                upload_headers = {
+                    "Authorization": f"OAuth {self.access_token}",
+                    "offset": "0",
+                    "file_size": str(file_size),
+                }
+                logger.info(
+                    "REEL 3/4: uploading %d bytes with offset=%s",
+                    file_size,
+                    upload_headers["offset"],
+                )
+                with open(video_path, "rb") as video_file:
+                    upload_response = requests.post(
+                        upload_uri,
+                        headers=upload_headers,
+                        data=video_file,
+                        timeout=180,
+                    )
+                upload_data = upload_response.json()
+                if upload_response.status_code != 200 or not upload_data.get("success", True):
+                    logger.error(
+                        "REEL 3/4 FAILED: binary upload HTTP %s: %s headers=%s",
+                        upload_response.status_code,
+                        upload_data,
+                        dict(upload_response.headers),
+                    )
+                    return None
+
+                logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
 
                 return container_id
 
         except Exception as e:
-            print(f"Error uploading video file: {str(e)}")
+            logger.exception("REEL upload exception: %s", e)
             return None
 
     def check_container_status(self, container_id):
@@ -165,12 +217,21 @@ class InstagramApiHelper:
         data = json.loads(response.text)
         
         if 'error' in data:
-            print(f"Error checking reel status: {data['error']['message']}")
+            logger.error(
+                "REEL 4/4 FAILED: status HTTP %s: %s",
+                response.status_code,
+                data,
+            )
             return 'ERROR'
             
         status_code = data.get('status_code', '')
         status_message = data.get('status', '')
-        print(f"Reel status: {status_code} - {status_message}")
+        logger.info(
+            "REEL 4/4: container status HTTP %s: %s - %s",
+            response.status_code,
+            status_code,
+            status_message,
+        )
         
         if 'Error:' in str(status_message):
             if '2207026' in str(status_message):
@@ -197,36 +258,49 @@ class InstagramApiHelper:
         data = json.loads(response.text)
 
         if "id" in data:
+            logger.info("REEL 4/4: published successfully: %s", data["id"])
             return f"Reel published successfully! ID: {data['id']}"
         elif "error" in data:
+            logger.error(
+                "REEL 4/4 FAILED: publish HTTP %s: %s",
+                response.status_code,
+                data,
+            )
             return f"Error publishing reel: {data['error']['message']}"
+        logger.error("REEL 4/4 FAILED: unexpected publish response: %s", data)
         return "Unknown error occurred while publishing reel"
 
     def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=2):
         """Complete process to post a reel including creation, status checking, and publishing"""
-        print(f"Starting reel upload process from URL: {video_path}")
+        logger.info("REEL: starting publish pipeline for %s", video_path)
         container_id = self.create_reel_container(video_path, caption, thumbnail_url)
         if not container_id:
+            logger.error("REEL FAILED: no usable container was created")
             return "Failed to create reel container"
 
         import time
         attempts = 0
         while attempts < max_attempts:
-            print(f"Checking reel status (attempt {attempts + 1}/{max_attempts})")
+            logger.info(
+                "REEL 4/4: checking container status (attempt %d/%d, id=%s)",
+                attempts + 1,
+                max_attempts,
+                container_id,
+            )
             status = self.check_container_status(container_id)
             
             if status == "FINISHED" or status == "ERROR":
-                print("Video processing completed successfully")
+                logger.info("REEL 4/4: container processing finished; publishing now")
                 return self.publish_reel(container_id)
 
             elif status == "IN_PROGRESS":
-                print("Video is still processing...")
+                logger.info("REEL 4/4: video is still processing")
             elif status == "PUBLISHED":
                 return "Reel already published"
             
             attempts += 1
             wait_time = 10  # Increased wait time between checks
-            print(f"Waiting {wait_time} seconds before next status check...")
+            logger.info("REEL: waiting %d seconds before next status check", wait_time)
             time.sleep(wait_time)
 
         return "Timeout waiting for video processing. The video may still be processing in the background."
