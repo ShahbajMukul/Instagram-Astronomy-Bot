@@ -179,6 +179,8 @@ class InstagramApiHelper:
                     "Authorization": f"OAuth {self.access_token}",
                     "offset": "0",
                     "file_size": str(file_size),
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": str(file_size),
                 }
                 logger.info(
                     "REEL 3/4: uploading %d bytes with offset=%s",
@@ -186,13 +188,17 @@ class InstagramApiHelper:
                     upload_headers["offset"],
                 )
                 with open(video_path, "rb") as video_file:
+                    upload_payload = video_file.read()
                     upload_response = requests.post(
                         upload_uri,
                         headers=upload_headers,
-                        data=video_file,
+                        data=upload_payload,
                         timeout=180,
                     )
-                upload_data = upload_response.json()
+                try:
+                    upload_data = upload_response.json()
+                except ValueError:
+                    upload_data = {"raw_response": upload_response.text}
                 if upload_response.status_code != 200 or not upload_data.get("success", True):
                     logger.error(
                         "REEL 3/4 FAILED: binary upload HTTP %s: %s headers=%s",

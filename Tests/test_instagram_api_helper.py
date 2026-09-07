@@ -71,6 +71,12 @@ class TestInstagramApiHelper(unittest.TestCase):
         
         container_id = self.insta.create_reel_container("dummy.mp4", "caption")
         self.assertEqual(container_id, "67890")
+        upload_call_kwargs = mock_post.call_args_list[1].kwargs
+        self.assertEqual(upload_call_kwargs["data"], b"data")
+        self.assertEqual(
+            upload_call_kwargs["headers"]["Content-Type"],
+            "application/octet-stream",
+        )
 
     @patch('instagram_api_helper.requests.post')
     @patch('instagram_api_helper.os.path.exists', return_value=True)
@@ -93,6 +99,7 @@ class TestInstagramApiHelper(unittest.TestCase):
         upload_headers = mock_post.call_args_list[1].kwargs["headers"]
         self.assertEqual(upload_headers["file_size"], "1234")
         self.assertEqual(upload_headers["offset"], "0")
+        self.assertEqual(upload_headers["Content-Length"], "1234")
 
     @patch('instagram_api_helper.InstagramApiHelper.publish_reel')
     @patch('instagram_api_helper.InstagramApiHelper.check_container_status')

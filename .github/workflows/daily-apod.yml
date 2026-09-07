@@ -59,7 +59,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-            git pull --rebase origin "$branch_name"
+            git pull --rebase --autostash origin "$branch_name"
 
             git add posted_dates.txt
 
@@ -74,7 +74,7 @@ jobs:
                   echo "Failed to push posted_dates.txt after retries."
                   exit 1
                 fi
-                git pull --rebase origin "$branch_name"
+                git pull --rebase --autostash origin "$branch_name"
               done
             fi
           fi
