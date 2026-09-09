@@ -117,5 +117,46 @@ class TestMainWorkflow(unittest.TestCase):
             "image_media_id", "Caption"
         )
 
+    @patch('main.open', create=True)
+    @patch('main.os.path.exists', return_value=False)
+    @patch('main.ReelGenerator')
+    @patch('main.InstagramApiHelper')
+    @patch('main.GeminiProcessing')
+    @patch('main.ApodApiHelper')
+    def test_work_replaces_video_apod_with_random_apod(
+        self,
+        mock_apod_cls,
+        mock_gemini_cls,
+        mock_insta_cls,
+        mock_reel_cls,
+        mock_exists,
+        mock_open,
+    ):
+        mock_apod = mock_apod_cls.return_value
+        mock_apod.get_apod_data.return_value = {"media_type": "video"}
+        mock_apod.get_random_apod_data.return_value = {
+            "title": "Random Image",
+            "copyright": "NASA",
+            "date": "2026-01-01",
+            "explanation": "Random image explanation.",
+            "media_type": "image",
+            "url": "https://example.com/random.jpg",
+            "hdurl": "https://example.com/random-hd.jpg",
+        }
+        mock_gemini_cls.return_value.generate_content.return_value = "Narration."
+        mock_insta = mock_insta_cls.return_value
+        mock_insta.write_caption.return_value = "Caption"
+        mock_insta.post_reel.return_value = "Reel published successfully! ID: reel_123"
+        mock_reel = mock_reel_cls.return_value
+        mock_reel.prepare_tts_text.side_effect = lambda text: text
+        mock_reel.create_reel.return_value = "mock_video.mp4"
+
+        main.work()
+
+        mock_apod.get_random_apod_data.assert_called_once_with()
+        mock_reel.create_reel.assert_called_once_with(
+            "https://example.com/random.jpg", "Narration."
+        )
+
 if __name__ == "__main__":
     unittest.main()

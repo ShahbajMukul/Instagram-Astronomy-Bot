@@ -27,6 +27,14 @@ def work():
     if "error" in apod_data:
         raise Exception(f"Error: {apod_data.get('error', {}).get('message', 'Unknown error')}")
 
+    if apod_data.get("media_type") == "video":
+        logger.info("APOD is a video; fetching a random image APOD instead")
+        apod_data = apod_helper.get_random_apod_data()
+        if not apod_data:
+            raise Exception("Failed to fetch a random APOD from NASA.")
+        if "error" in apod_data:
+            raise Exception(f"Error: {apod_data.get('error', {}).get('message', 'Unknown error')}")
+
     # Extract APOD data
     title = apod_data["title"]
     image_by = apod_data.get('copyright')
