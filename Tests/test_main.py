@@ -35,6 +35,10 @@ class TestMainWorkflow(unittest.TestCase):
         mock_gemini = MagicMock()
         mock_gemini_cls.return_value = mock_gemini
         mock_gemini.generate_content.return_value = "Gemini generated poetic narration."
+        mock_gemini.generate_content.return_value = (
+            "Gemini generated poetic narration. #astronomy #space"
+        )
+        mock_gemini_cls.extract_hashtags.return_value = "#astronomy #space"
 
         mock_insta = MagicMock()
         mock_insta_cls.return_value = mock_insta
@@ -45,7 +49,7 @@ class TestMainWorkflow(unittest.TestCase):
 
         mock_reel_gen = MagicMock()
         mock_reel_cls.return_value = mock_reel_gen
-        mock_reel_gen.prepare_tts_text.side_effect = lambda t: t
+        mock_reel_gen.prepare_tts_text.side_effect = lambda t: t.split(" #", 1)[0]
         mock_reel_gen.create_reel.return_value = "mock_video.mp4"
 
         # Run work()
@@ -67,7 +71,7 @@ class TestMainWorkflow(unittest.TestCase):
 
         mock_insta.post_reel.assert_called_once_with(
             video_path="mock_video.mp4",
-            caption="Formatted Raw APOD Caption"
+            caption="Formatted Raw APOD Caption\n\n#astronomy #space"
         )
         mock_insta.create_media_id.assert_not_called()
 
@@ -97,6 +101,7 @@ class TestMainWorkflow(unittest.TestCase):
             "hdurl": "https://example.com/image_hd.jpg",
         }
         mock_gemini_cls.return_value.generate_content.return_value = "Narration."
+        mock_gemini_cls.extract_hashtags.return_value = ""
         mock_insta = mock_insta_cls.return_value
         mock_insta.write_caption.return_value = "Caption"
         mock_insta.create_media_id.return_value = "image_media_id"
@@ -144,6 +149,7 @@ class TestMainWorkflow(unittest.TestCase):
             "hdurl": "https://example.com/random-hd.jpg",
         }
         mock_gemini_cls.return_value.generate_content.return_value = "Narration."
+        mock_gemini_cls.extract_hashtags.return_value = ""
         mock_insta = mock_insta_cls.return_value
         mock_insta.write_caption.return_value = "Caption"
         mock_insta.post_reel.return_value = "Reel published successfully! ID: reel_123"

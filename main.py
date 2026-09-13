@@ -68,6 +68,9 @@ def work():
     # Format Instagram caption using the raw NASA APOD explanation
     instagram_helper = InstagramApiHelper()
     caption = instagram_helper.write_caption(title, image_by, date, explanation)
+    hashtags = GeminiProcessing.extract_hashtags(bot_says)
+    if hashtags:
+        caption = f"{caption}\n\n{hashtags}"[:2200]
     
     # Create and post the reel; fall back to an image if reel posting fails.
     print("Creating reel from APOD content...")

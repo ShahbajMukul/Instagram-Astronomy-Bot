@@ -33,6 +33,13 @@ class TestGeminiProcessingSanitization(unittest.TestCase):
         result = GeminiProcessing.sanitize_output(input_text)
         self.assertEqual(result, expected)
 
+    def test_extract_hashtags_preserves_order_and_removes_duplicates(self):
+        result = GeminiProcessing.extract_hashtags(
+            "A cosmic view #space #NASA and #space again."
+        )
+
+        self.assertEqual(result, "#space #NASA")
+
     def test_sanitize_output_strips_markdown_headers_and_links(self):
         input_text = (
             "### Cosmic Discovery\n\n"

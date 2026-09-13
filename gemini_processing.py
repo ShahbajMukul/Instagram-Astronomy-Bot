@@ -24,7 +24,7 @@ class GeminiProcessing:
         )
         self.model_name = os.getenv(
             "GEMINI_MODEL",
-            "gemini-3.6-flash",
+            "gemini-3.8-flash",
         )
 
         if not self.gemini_api_key:
@@ -123,6 +123,13 @@ class GeminiProcessing:
         text = re.sub(r"\n{3,}", "\n\n", text)
 
         return text.strip()
+
+    @staticmethod
+    def extract_hashtags(text: str) -> str:
+        """Return unique hashtag tokens from Gemini output in their original order."""
+        hashtags = re.findall(r"(?<![\w#])#[A-Za-z0-9_]+", text)
+        unique_hashtags = list(dict.fromkeys(hashtags))
+        return " ".join(unique_hashtags)
 
     def generate_content(
         self,
