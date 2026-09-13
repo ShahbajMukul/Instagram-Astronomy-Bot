@@ -154,5 +154,38 @@ class TestInstagramApiHelper(unittest.TestCase):
         result = self.insta.post_reel("dummy.mp4", "caption")
         self.assertEqual(result, "Reel published successfully!")
 
+    @patch('time.sleep', return_value=None)
+    @patch('instagram_api_helper.InstagramApiHelper.publish_reel')
+    @patch('instagram_api_helper.InstagramApiHelper.check_container_status')
+    @patch('instagram_api_helper.InstagramApiHelper.create_reel_container')
+    def test_post_reel_retries_transient_error_status(
+        self, mock_create, mock_status, mock_publish, mock_sleep
+    ):
+        mock_create.return_value = "67890"
+        mock_status.side_effect = ["ERROR", "IN_PROGRESS", "FINISHED"]
+        mock_publish.return_value = "Reel published successfully!"
+
+        result = self.insta.post_reel("dummy.mp4", "caption")
+
+        self.assertEqual(result, "Reel published successfully!")
+        self.assertEqual(mock_status.call_count, 3)
+        mock_publish.assert_called_once_with("67890")
+
+    @patch('time.sleep', return_value=None)
+    @patch('instagram_api_helper.InstagramApiHelper.publish_reel')
+    @patch('instagram_api_helper.InstagramApiHelper.check_container_status')
+    @patch('instagram_api_helper.InstagramApiHelper.create_reel_container')
+    def test_post_reel_retries_container_creation(
+        self, mock_create, mock_status, mock_publish, mock_sleep
+    ):
+        mock_create.side_effect = [None, None, "67890"]
+        mock_status.return_value = "FINISHED"
+        mock_publish.return_value = "Reel published successfully!"
+
+        result = self.insta.post_reel("dummy.mp4", "caption")
+
+        self.assertEqual(result, "Reel published successfully!")
+        self.assertEqual(mock_create.call_count, 3)
+
 if __name__ == '__main__':
     unittest.main()
