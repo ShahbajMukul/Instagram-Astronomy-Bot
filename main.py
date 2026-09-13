@@ -15,6 +15,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def work():
+    logger.info(
+        "RUN SOURCE: %s",
+        os.getenv("GITHUB_SHA", "local-working-tree"),
+    )
     print('\n' + "Working" + '\n')
     print("Current time: " + datetime.now().strftime("%H:%M:%S") + "\n")
 
@@ -61,9 +65,14 @@ def work():
     
     print("Data received from NASA. Processing data...")
     
-    # Generate AI description for TTS voiceover narration
-    bot = GeminiProcessing()
-    bot_says = bot.generate_content(explanation, image_url)
+    test_video_path = os.getenv("TEST_VIDEO_PATH")
+    if test_video_path:
+        logger.info("REEL: test-video mode enabled; skipping Gemini and Cartesia")
+        bot_says = ""
+    else:
+        # Generate AI description for TTS voiceover narration
+        bot = GeminiProcessing()
+        bot_says = bot.generate_content(explanation, image_url)
 
     # Format Instagram caption using the raw NASA APOD explanation
     instagram_helper = InstagramApiHelper()
@@ -77,11 +86,15 @@ def work():
     reel_generator = ReelGenerator()
     
     # Prepare Gemini response for TTS narration (clean URLs/hashtags, sentence boundary trim)
-    tts_text = reel_generator.prepare_tts_text(bot_says)
+    tts_text = reel_generator.prepare_tts_text(bot_says) if bot_says else ""
     
     video_path = None
     try:
-        video_path = reel_generator.create_reel(image_url, tts_text)
+        if test_video_path:
+            video_path = test_video_path
+            logger.info("REEL: using test video from TEST_VIDEO_PATH=%s", video_path)
+        else:
+            video_path = reel_generator.create_reel(image_url, tts_text)
         logger.info("REEL: generated video retained at %s", video_path)
         
         # Upload video file to Instagram with raw APOD caption

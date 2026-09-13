@@ -5,6 +5,12 @@ on:
     - cron: "0 20 * * *"
 
   workflow_dispatch:
+    inputs:
+      test_video_path:
+        description: "Optional repository video path for an upload-only test"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -49,6 +55,7 @@ jobs:
           CARTESIA_MODEL: ${{ secrets.CARTESIA_MODEL }}
           MUSIC_DIR: music
           MUSIC_VOLUME: "0.12"
+          TEST_VIDEO_PATH: ${{ inputs.test_video_path }}
         run: python main.py
 
       - name: Save posting history
