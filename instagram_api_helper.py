@@ -206,19 +206,10 @@ class InstagramApiHelper:
                         upload_data,
                         dict(upload_response.headers),
                     )
-                    recovered_status = self.check_container_status(container_id)
-                    if recovered_status in ("FINISHED", "PUBLISHED"):
-                        logger.warning(
-                            "REEL 3/4: upload response was unsuccessful, but container is %s; continuing",
-                            recovered_status,
-                        )
-                        return container_id
-                    if recovered_status == "IN_PROGRESS":
-                        logger.warning(
-                            "REEL 3/4: upload response was unsuccessful, but container is still processing; continuing",
-                        )
-                        return container_id
-                    return None
+                    logger.warning(
+                        "REEL 3/4: keeping initialized container; Instagram may still be processing the upload",
+                    )
+                    return container_id
 
                 logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
 
@@ -288,7 +279,7 @@ class InstagramApiHelper:
         logger.error("REEL 4/4 FAILED: unexpected publish response: %s", data)
         return "Unknown error occurred while publishing reel"
 
-    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=2):
+    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=6):
         """Complete process to post a reel including creation, status checking, and publishing"""
         logger.info("REEL: starting publish pipeline for %s", video_path)
         container_id = self.create_reel_container(video_path, caption, thumbnail_url)

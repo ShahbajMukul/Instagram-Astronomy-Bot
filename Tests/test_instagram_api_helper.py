@@ -97,7 +97,7 @@ class TestInstagramApiHelper(unittest.TestCase):
 
         container_id = self.insta.create_reel_container("dummy.mp4", "caption")
 
-        self.assertIsNone(container_id)
+        self.assertEqual(container_id, "67890")
         upload_headers = mock_post.call_args_list[1].kwargs["headers"]
         self.assertEqual(upload_headers["file_size"], "1234")
         self.assertEqual(upload_headers["offset"], "0")
