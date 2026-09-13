@@ -58,6 +58,15 @@ jobs:
           TEST_VIDEO_PATH: ${{ inputs.test_video_path }}
         run: python main.py
 
+      - name: Upload failed reel for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-reel-${{ github.run_id }}
+          path: /tmp/astronomy_reel_*.mp4
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Save posting history
         if: always()
         run: |

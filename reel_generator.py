@@ -1,6 +1,7 @@
 import os
 import random
 import re
+import shutil
 import subprocess
 import tempfile
 import numpy
@@ -115,6 +116,27 @@ class ReelGenerator:
         if result.returncode != 0:
             details = result.stderr.strip() or "FFmpeg could not decode the video"
             raise RuntimeError(f"Generated reel failed validation: {details}")
+
+        ffprobe_path = shutil.which("ffprobe")
+        if ffprobe_path:
+            metadata = subprocess.run(
+                [
+                    ffprobe_path,
+                    "-v", "error",
+                    "-show_entries",
+                    "format=duration:stream=codec_name,codec_type,profile,width,height,pix_fmt,r_frame_rate,level",
+                    "-of", "json",
+                    video_path,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            if metadata.returncode != 0:
+                details = metadata.stderr.strip() or "ffprobe could not inspect the video"
+                raise RuntimeError(f"Generated reel metadata validation failed: {details}")
+            print(f"Generated reel metadata: {metadata.stdout.strip()}")
 
     def create_reel(self, image_url, text, max_duration=90):
         """Create a reel from image and text"""

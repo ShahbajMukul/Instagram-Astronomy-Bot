@@ -123,7 +123,6 @@ def work():
                 video_path,
                 os.path.getsize(video_path),
             )
-            os.remove(video_path)
 
         logger.info("IMAGE FALLBACK: posting the APOD image")
         try:

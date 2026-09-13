@@ -86,7 +86,10 @@ class InstagramApiHelper:
             raise Exception(f"Something went wrong while posting the image! Status code: {response.status_code}. Response: {response.text}")
     def post_default_image(self, caption):
         print("\nPosting default image... \n")
-        default_image_url = "https://www.nasa.gov/sites/default/files/styles/side_image/public/thumbnails/image/apod_logo.png?itok=6It-nhCr"
+        default_image_url = (
+            "https://upload.wikimedia.org/wikipedia/commons/0/02/"
+            "OSIRIS_Mars_true_color.jpg"
+        )
         caption += "\nToday's APOD is not supported by Instagram 😞"
         post_id = self.create_media_id(default_image_url, default_image_url, caption)
         return self.publish_media(post_id, caption)
