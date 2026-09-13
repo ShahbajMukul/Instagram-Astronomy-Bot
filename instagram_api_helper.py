@@ -282,16 +282,29 @@ class InstagramApiHelper:
         logger.error("REEL 4/4 FAILED: unexpected publish response: %s", data)
         return "Unknown error occurred while publishing reel"
 
-    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=6):
+    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=12):
         """Complete process to post a reel including creation, status checking, and publishing"""
         logger.info("REEL: starting publish pipeline for %s", video_path)
-        container_id = self.create_reel_container(video_path, caption, thumbnail_url)
+        container_id = None
+        for creation_attempt in range(1, 4):
+            container_id = self.create_reel_container(video_path, caption, thumbnail_url)
+            if container_id:
+                break
+            logger.warning(
+                "REEL 2/4: container creation attempt %d/3 failed",
+                creation_attempt,
+            )
+            if creation_attempt < 3:
+                import time
+                time.sleep(5)
+
         if not container_id:
             logger.error("REEL FAILED: no usable container was created")
             return "Failed to create reel container"
 
         import time
         attempts = 0
+        consecutive_error_statuses = 0
         while attempts < max_attempts:
             logger.info(
                 "REEL 4/4: checking container status (attempt %d/%d, id=%s)",
@@ -306,13 +319,24 @@ class InstagramApiHelper:
                 return self.publish_reel(container_id)
 
             elif status == "ERROR":
-                logger.error("REEL 4/4: container processing failed; will not publish")
-                return "Reel processing failed"
+                consecutive_error_statuses += 1
+                if consecutive_error_statuses >= 3:
+                    logger.error(
+                        "REEL 4/4: container processing failed repeatedly; will not publish",
+                    )
+                    return "Reel processing failed"
+                logger.warning(
+                    "REEL 4/4: transient ERROR status (%d/3), retrying status check",
+                    consecutive_error_statuses,
+                )
 
             elif status == "IN_PROGRESS":
+                consecutive_error_statuses = 0
                 logger.info("REEL 4/4: video is still processing")
             elif status == "PUBLISHED":
                 return "Reel already published"
+            else:
+                consecutive_error_statuses = 0
             
             attempts += 1
             wait_time = 10  # Increased wait time between checks
