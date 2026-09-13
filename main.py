@@ -31,18 +31,10 @@ def work():
     if "error" in apod_data:
         raise Exception(f"Error: {apod_data.get('error', {}).get('message', 'Unknown error')}")
 
-    if apod_data.get("media_type") == "video":
-        logger.info("APOD is a video; fetching a random image APOD instead")
-        apod_data = apod_helper.get_random_apod_data()
-        if not apod_data:
-            raise Exception("Failed to fetch a random APOD from NASA.")
-        if "error" in apod_data:
-            raise Exception(f"Error: {apod_data.get('error', {}).get('message', 'Unknown error')}")
+    original_apod = apod_data
 
-    # Extract APOD data
-    title = apod_data["title"]
-    image_by = apod_data.get('copyright')
-    date_str = apod_data["date"]
+    # Do not repost an APOD date that has already succeeded.
+    date_str = original_apod["date"]
     
     posted_dates_file = "posted_dates.txt"
     if os.path.exists(posted_dates_file):
@@ -53,90 +45,110 @@ def work():
 
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     date = date_obj.strftime("%m/%d/%Y")
-    explanation = apod_data["explanation"]
-    
-    media_type = apod_data.get("media_type")
-    if media_type == "video":
-        image_hd_url = apod_data.get("thumbnail_url", apod_data.get("url"))
-        image_url = apod_data.get("thumbnail_url", apod_data.get("url"))
-    else:
-        image_hd_url = apod_data.get("hdurl", apod_data.get("url"))
-        image_url = apod_data.get("url")
-    
-    print("Data received from NASA. Processing data...")
-    
     test_video_path = os.getenv("TEST_VIDEO_PATH")
-    if test_video_path:
-        logger.info("REEL: test-video mode enabled; skipping Gemini and Cartesia")
-        bot_says = ""
-    else:
-        # Generate AI description for TTS voiceover narration
-        bot = GeminiProcessing()
-        bot_says = bot.generate_content(explanation, image_url)
-
-    # Format Instagram caption using the raw NASA APOD explanation
     instagram_helper = InstagramApiHelper()
-    caption = instagram_helper.write_caption(title, image_by, date, explanation)
-    hashtags = GeminiProcessing.extract_hashtags(bot_says)
-    if hashtags:
-        caption = f"{caption}\n\n{hashtags}"[:2200]
-    
-    # Create and post the reel; fall back to an image if reel posting fails.
-    print("Creating reel from APOD content...")
     reel_generator = ReelGenerator()
-    
-    # Prepare Gemini response for TTS narration (clean URLs/hashtags, sentence boundary trim)
-    tts_text = reel_generator.prepare_tts_text(bot_says) if bot_says else ""
-    
-    video_path = None
-    try:
-        if test_video_path:
-            video_path = test_video_path
-            logger.info("REEL: using test video from TEST_VIDEO_PATH=%s", video_path)
-        else:
-            video_path = reel_generator.create_reel(image_url, tts_text)
-        logger.info("REEL: generated video retained at %s", video_path)
-        
-        # Upload video file to Instagram with raw APOD caption
-        reel_result = instagram_helper.post_reel(
-            video_path=video_path,
-            caption=caption
-        )
-        print("\n" + reel_result + "\n")
 
-        reel_succeeded = reel_result.startswith((
+    def post_candidate(candidate, direct_video=False):
+        title = candidate["title"]
+        image_by = candidate.get("copyright")
+        explanation = candidate["explanation"]
+        candidate_date = datetime.strptime(candidate["date"], "%Y-%m-%d").strftime("%m/%d/%Y")
+        image_url = candidate.get("url")
+
+        if test_video_path:
+            bot_says = ""
+        else:
+            bot = GeminiProcessing()
+            bot_says = bot.generate_content(explanation, None if direct_video else image_url)
+
+        caption_explanation = bot_says if direct_video and bot_says else explanation
+        caption = instagram_helper.write_caption(
+            title, image_by, candidate_date, caption_explanation
+        )
+        hashtags = GeminiProcessing.extract_hashtags(bot_says)
+        if hashtags:
+            caption = f"{caption}\n\n{hashtags}"[:2200]
+
+        if direct_video:
+            video_path = candidate["url"]
+        elif test_video_path:
+            video_path = test_video_path
+        else:
+            tts_text = reel_generator.prepare_tts_text(bot_says)
+            video_path = reel_generator.create_reel(image_url, tts_text)
+
+        logger.info("REEL: posting candidate %s", video_path)
+        result = instagram_helper.post_reel(video_path=video_path, caption=caption)
+        succeeded = result.startswith((
             "Reel published successfully",
             "Reel already published",
         ))
-        if not reel_succeeded:
-            raise RuntimeError(f"Reel posting failed: {reel_result}")
-        
-        # Clean up only after a confirmed successful publish.
-        if os.path.exists(video_path):
+        if not succeeded:
+            raise RuntimeError(f"Reel posting failed: {result}")
+        return candidate, caption, video_path, result
+
+    print("Data received from NASA. Processing data...")
+    candidate = original_apod
+    direct_video = candidate.get("media_type") == "video" and not test_video_path
+    if direct_video:
+        logger.info("APOD is a video; attempting to post NASA video directly")
+    else:
+        candidate = apod_helper.get_random_apod_data()
+        logger.info("APOD is not a direct-postable video; using a random image APOD")
+
+    video_path = None
+    try:
+        candidate, caption, video_path, reel_result = post_candidate(candidate, direct_video)
+        print("\n" + reel_result + "\n")
+        if video_path and not direct_video and not test_video_path and os.path.exists(video_path):
             os.remove(video_path)
-            
-    except Exception as e:
-        logger.exception("REEL FAILED: %s", e)
-        if video_path and os.path.exists(video_path):
-            logger.error(
-                "REEL DEBUG: failed video preserved at %s (%d bytes)",
-                video_path,
-                os.path.getsize(video_path),
+    except Exception as first_error:
+        logger.exception("REEL CANDIDATE FAILED: %s", first_error)
+        if direct_video:
+            logger.info("DIRECT VIDEO FAILED: selecting a random image APOD")
+            candidate = apod_helper.get_random_apod_data()
+            video_path = None
+            try:
+                candidate, caption, video_path, reel_result = post_candidate(candidate)
+                print("\n" + reel_result + "\n")
+                if video_path and not test_video_path and os.path.exists(video_path):
+                    os.remove(video_path)
+            except Exception as random_error:
+                logger.exception("RANDOM APOD REEL FAILED: %s", random_error)
+                fallback_caption = instagram_helper.write_caption(
+                    candidate["title"],
+                    candidate.get("copyright"),
+                    datetime.strptime(candidate["date"], "%Y-%m-%d").strftime("%m/%d/%Y"),
+                    candidate["explanation"],
+                )
+                try:
+                    media_id = instagram_helper.create_media_id(
+                        candidate.get("hdurl", candidate.get("url")),
+                        candidate.get("url"),
+                        fallback_caption,
+                    )
+                    instagram_helper.publish_media(media_id, fallback_caption)
+                except Exception as image_error:
+                    logger.exception("RANDOM APOD IMAGE FALLBACK FAILED: %s", image_error)
+                    instagram_helper.post_default_image(fallback_caption)
+        else:
+            logger.info("REEL FAILED: posting the selected APOD image fallback")
+            fallback_caption = instagram_helper.write_caption(
+                candidate["title"],
+                candidate.get("copyright"),
+                datetime.strptime(candidate["date"], "%Y-%m-%d").strftime("%m/%d/%Y"),
+                candidate["explanation"],
             )
-
-        logger.info("IMAGE FALLBACK: posting the APOD image")
-        try:
-            media_id = instagram_helper.create_media_id(
-                image_hd_url,
-                image_url,
-                caption,
-            )
-            fallback_result = instagram_helper.publish_media(media_id, caption)
-        except Exception as image_error:
-            logger.exception("IMAGE FALLBACK: primary image failed: %s", image_error)
-            fallback_result = instagram_helper.post_default_image(caption)
-
-        logger.info("IMAGE FALLBACK: %s", fallback_result)
+            try:
+                image_url = candidate.get("url")
+                media_id = instagram_helper.create_media_id(
+                    candidate.get("hdurl", image_url), image_url, fallback_caption
+                )
+                instagram_helper.publish_media(media_id, fallback_caption)
+            except Exception as image_error:
+                logger.exception("IMAGE FALLBACK FAILED: %s", image_error)
+                instagram_helper.post_default_image(fallback_caption)
 
     # Record the date after either a confirmed reel or image fallback succeeds.
     with open(posted_dates_file, "a") as f:

@@ -39,27 +39,36 @@ class ApodApiHelper:
                     print("All attempts to fetch APOD data failed.")
                     return None  
 
-    def get_random_apod_data(self, timeout: int = 30):
-        """Fetch the APOD for one randomly selected date."""
+    def get_random_apod_data(self, timeout: int = 30, max_attempts: int = 5):
+        """Fetch a randomly selected image APOD, skipping video entries."""
         api_key = os.getenv("NASA_API_KEY", "DEMO_KEY")
         first_apod_date = date(2015, 11, 30) # The first date for which APOD data is available
         days_since_first_apod = (date.today() - first_apod_date).days
-        random_date = first_apod_date + timedelta(
-            days=random.randint(0, days_since_first_apod)
-        )
-        date_string = random_date.isoformat()
-        url = (
-            "https://api.nasa.gov/planetary/apod?"
-            f"start_date={date_string}&end_date={date_string}&api_key={api_key}"
-        )
+        for _ in range(max_attempts):
+            random_date = first_apod_date + timedelta(
+                days=random.randint(0, days_since_first_apod)
+            )
+            date_string = random_date.isoformat()
+            url = (
+                "https://api.nasa.gov/planetary/apod?"
+                f"start_date={date_string}&end_date={date_string}&api_key={api_key}"
+            )
 
-        response = requests.get(url, timeout=timeout)
-        response.raise_for_status()
-        data = response.json()
-        # include in the explanation that this is a random APOD because the original APOD was a video
-        # fix the error : TypeError: list indices must be integers or slices, not str
-        if isinstance(data, list):
-            data = data[0]  
-        data["explanation"] = f"`This is a random APOD because the today's original APOD was a video and we couldn't use it` {data['explanation']}"
-        data["copyright"] = data.get("copyright", "").replace("\n", ",").lstrip()
-        return data
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list):
+                data = data[0]
+
+            if data.get("media_type") == "video":
+                continue
+
+            data["explanation"] = (
+                "`This is a random APOD because today's original APOD was a video "
+                "and we couldn't use it` "
+                f"{data['explanation']}"
+            )
+            data["copyright"] = data.get("copyright", "").replace("\n", ",").lstrip()
+            return data
+
+        raise RuntimeError("Could not find a random image APOD after several attempts.")

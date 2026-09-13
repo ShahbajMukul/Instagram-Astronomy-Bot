@@ -31,6 +31,7 @@ class TestMainWorkflow(unittest.TestCase):
             "url": "https://example.com/image.jpg",
             "hdurl": "https://example.com/image_hd.jpg"
         }
+        mock_apod_helper.get_random_apod_data.return_value = mock_apod_helper.get_apod_data.return_value
 
         mock_gemini = MagicMock()
         mock_gemini_cls.return_value = mock_gemini
@@ -100,6 +101,7 @@ class TestMainWorkflow(unittest.TestCase):
             "url": "https://example.com/image.jpg",
             "hdurl": "https://example.com/image_hd.jpg",
         }
+        mock_apod_cls.return_value.get_random_apod_data.return_value = mock_apod_cls.return_value.get_apod_data.return_value
         mock_gemini_cls.return_value.generate_content.return_value = "Narration."
         mock_gemini_cls.extract_hashtags.return_value = ""
         mock_insta = mock_insta_cls.return_value
@@ -128,7 +130,7 @@ class TestMainWorkflow(unittest.TestCase):
     @patch('main.InstagramApiHelper')
     @patch('main.GeminiProcessing')
     @patch('main.ApodApiHelper')
-    def test_work_replaces_video_apod_with_random_apod(
+    def test_work_posts_video_apod_directly_with_gemini_caption(
         self,
         mock_apod_cls,
         mock_gemini_cls,
@@ -138,30 +140,89 @@ class TestMainWorkflow(unittest.TestCase):
         mock_open,
     ):
         mock_apod = mock_apod_cls.return_value
-        mock_apod.get_apod_data.return_value = {"media_type": "video"}
+        mock_apod.get_apod_data.return_value = {
+            "title": "Comet Video",
+            "copyright": "NASA",
+            "date": "2026-01-01",
+            "explanation": "Original video explanation.",
+            "media_type": "video",
+            "url": "https://example.com/apod.mp4",
+        }
+        mock_gemini_cls.return_value.generate_content.return_value = (
+            "Gemini video explanation. #space"
+        )
+        mock_gemini_cls.extract_hashtags.return_value = "#space"
+        mock_insta = mock_insta_cls.return_value
+        mock_insta.write_caption.return_value = "Caption"
+        mock_insta.post_reel.return_value = "Reel published successfully! ID: reel_123"
+        mock_reel = mock_reel_cls.return_value
+
+        main.work()
+
+        mock_apod.get_random_apod_data.assert_not_called()
+        mock_gemini_cls.return_value.generate_content.assert_called_once_with(
+            "Original video explanation.", None
+        )
+        mock_insta.write_caption.assert_called_once_with(
+            "Comet Video", "NASA", "01/01/2026", "Gemini video explanation. #space"
+        )
+        mock_insta.post_reel.assert_called_once_with(
+            video_path="https://example.com/apod.mp4",
+            caption="Caption\n\n#space",
+        )
+
+    @patch('main.open', create=True)
+    @patch('main.os.path.exists', return_value=False)
+    @patch('main.ReelGenerator')
+    @patch('main.InstagramApiHelper')
+    @patch('main.GeminiProcessing')
+    @patch('main.ApodApiHelper')
+    def test_work_falls_back_to_random_image_after_video_fails(
+        self,
+        mock_apod_cls,
+        mock_gemini_cls,
+        mock_insta_cls,
+        mock_reel_cls,
+        mock_exists,
+        mock_open,
+    ):
+        mock_apod = mock_apod_cls.return_value
+        mock_apod.get_apod_data.return_value = {
+            "title": "Comet Video",
+            "copyright": "NASA",
+            "date": "2026-01-01",
+            "explanation": "Original video explanation.",
+            "media_type": "video",
+            "url": "https://example.com/apod.mp4",
+        }
         mock_apod.get_random_apod_data.return_value = {
             "title": "Random Image",
             "copyright": "NASA",
-            "date": "2026-01-01",
+            "date": "2026-01-02",
             "explanation": "Random image explanation.",
             "media_type": "image",
             "url": "https://example.com/random.jpg",
             "hdurl": "https://example.com/random-hd.jpg",
         }
-        mock_gemini_cls.return_value.generate_content.return_value = "Narration."
+        mock_gemini_cls.return_value.generate_content.side_effect = [
+            "Video caption.", "Random narration."
+        ]
         mock_gemini_cls.extract_hashtags.return_value = ""
         mock_insta = mock_insta_cls.return_value
-        mock_insta.write_caption.return_value = "Caption"
-        mock_insta.post_reel.return_value = "Reel published successfully! ID: reel_123"
+        mock_insta.write_caption.side_effect = ["Video caption", "Random caption"]
+        mock_insta.post_reel.side_effect = ["Failed to create reel container", "Reel published successfully!"]
         mock_reel = mock_reel_cls.return_value
-        mock_reel.prepare_tts_text.side_effect = lambda text: text
-        mock_reel.create_reel.return_value = "mock_video.mp4"
+        mock_reel.prepare_tts_text.return_value = "Random narration."
+        mock_reel.create_reel.return_value = "random.mp4"
 
         main.work()
 
         mock_apod.get_random_apod_data.assert_called_once_with()
+        mock_insta.post_reel.assert_any_call(
+            video_path="https://example.com/apod.mp4", caption="Video caption"
+        )
         mock_reel.create_reel.assert_called_once_with(
-            "https://example.com/random.jpg", "Narration."
+            "https://example.com/random.jpg", "Random narration."
         )
 
 if __name__ == "__main__":

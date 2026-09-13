@@ -43,6 +43,7 @@ def test_get_random_apod_data_uses_single_random_date(mock_get):
         "explanation": "A random explanation",
         "title": "A random APOD",
         "copyright": "NASA\nESA",
+        "media_type": "image",
     }
     mock_get.return_value.raise_for_status.return_value = None
 
@@ -53,3 +54,27 @@ def test_get_random_apod_data_uses_single_random_date(mock_get):
     assert "start_date=" in requested_url
     assert "end_date=" in requested_url
     assert data["copyright"] == "NASA,ESA"
+
+
+@patch('apod_api_helper.random.randint', side_effect=[1, 2])
+@patch('apod_api_helper.requests.get')
+def test_get_random_apod_data_skips_video(mock_get, mock_randint):
+    video_response = {
+        "date": "2026-01-01",
+        "media_type": "video",
+    }
+    image_response = {
+        "date": "2026-01-02",
+        "explanation": "An image explanation",
+        "title": "An image APOD",
+        "copyright": "NASA",
+        "media_type": "image",
+    }
+    mock_get.return_value.raise_for_status.return_value = None
+    mock_get.return_value.json.side_effect = [video_response, image_response]
+
+    helper = ApodApiHelper()
+    data = helper.get_random_apod_data()
+
+    assert data["media_type"] == "image"
+    assert mock_get.call_count == 2
