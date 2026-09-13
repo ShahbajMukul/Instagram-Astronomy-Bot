@@ -78,8 +78,26 @@ jobs:
             git add posted_dates.txt
 
             if ! git diff --cached --quiet; then
+              rebase_posted_dates() {
+                if git pull --rebase origin "$branch_name"; then
+                  return 0
+                fi
+
+                if git diff --name-only --diff-filter=U | grep -qx "posted_dates.txt"; then
+                  grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' posted_dates.txt | sort -u > posted_dates.txt.merged
+                  mv posted_dates.txt.merged posted_dates.txt
+                  git add posted_dates.txt
+                  if GIT_EDITOR=true git rebase --continue; then
+                    return 0
+                  fi
+                fi
+
+                git rebase --abort || true
+                return 1
+              }
+
               git commit -m "Record APOD post"
-              git pull --rebase origin "$branch_name"
+              rebase_posted_dates
 
               for attempt in 1 2 3; do
                 if git push origin "HEAD:$branch_name"; then
@@ -89,7 +107,7 @@ jobs:
                   echo "Failed to push posted_dates.txt after retries."
                   exit 1
                 fi
-                git pull --rebase origin "$branch_name"
+                rebase_posted_dates
               done
             fi
           fi
