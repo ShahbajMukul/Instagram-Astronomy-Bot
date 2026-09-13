@@ -206,6 +206,18 @@ class InstagramApiHelper:
                         upload_data,
                         dict(upload_response.headers),
                     )
+                    recovered_status = self.check_container_status(container_id)
+                    if recovered_status in ("FINISHED", "PUBLISHED"):
+                        logger.warning(
+                            "REEL 3/4: upload response was unsuccessful, but container is %s; continuing",
+                            recovered_status,
+                        )
+                        return container_id
+                    if recovered_status == "IN_PROGRESS":
+                        logger.warning(
+                            "REEL 3/4: upload response was unsuccessful, but container is still processing; continuing",
+                        )
+                        return container_id
                     return None
 
                 logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
@@ -295,9 +307,13 @@ class InstagramApiHelper:
             )
             status = self.check_container_status(container_id)
             
-            if status == "FINISHED" or status == "ERROR":
+            if status == "FINISHED":
                 logger.info("REEL 4/4: container processing finished; publishing now")
                 return self.publish_reel(container_id)
+
+            elif status == "ERROR":
+                logger.error("REEL 4/4: container processing failed; will not publish")
+                return "Reel processing failed"
 
             elif status == "IN_PROGRESS":
                 logger.info("REEL 4/4: video is still processing")
