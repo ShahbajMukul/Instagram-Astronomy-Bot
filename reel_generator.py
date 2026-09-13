@@ -1,10 +1,12 @@
 import os
 import random
 import re
+import subprocess
 import tempfile
 import numpy
 from cartesia import Cartesia
 from dotenv import load_dotenv
+from imageio_ffmpeg import get_ffmpeg_exe
 from moviepy import AudioFileClip, CompositeAudioClip, ImageClip
 from moviepy.audio.fx.AudioLoop import AudioLoop
 from PIL import Image
@@ -99,6 +101,21 @@ class ReelGenerator:
             music_clip = music_clip.subclipped(0, duration)
         return music_clip.with_volume_scaled(self.music_volume)
 
+    @staticmethod
+    def _validate_video_file(video_path):
+        """Decode the finished file so corrupt output is never sent to Instagram."""
+        ffmpeg_path = get_ffmpeg_exe()
+        result = subprocess.run(
+            [ffmpeg_path, "-v", "error", "-i", video_path, "-f", "null", "-"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            details = result.stderr.strip() or "FFmpeg could not decode the video"
+            raise RuntimeError(f"Generated reel failed validation: {details}")
+
     def create_reel(self, image_url, text, max_duration=90):
         """Create a reel from image and text"""
         # Download image
@@ -108,9 +125,12 @@ class ReelGenerator:
         
         # Generate audio from text and save to temp file
         audio_data = self.generate_speech(text)
-        temp_dir = tempfile.gettempdir()
-        temp_audio_path = os.path.join(temp_dir, 'temp_audio.wav')
-        temp_video_path = os.path.join(temp_dir, 'temp_reel.mp4')
+        temp_audio_path = tempfile.NamedTemporaryFile(
+            suffix=".wav", prefix="astronomy_tts_", delete=False
+        ).name
+        temp_video_path = tempfile.NamedTemporaryFile(
+            suffix=".mp4", prefix="astronomy_reel_", delete=False
+        ).name
         
         try:
             # Save audio data to temporary file
@@ -210,6 +230,8 @@ class ReelGenerator:
             if music_clip:
                 music_clip.close()
             video.close()
+
+            self._validate_video_file(temp_video_path)
 
             # Clean up temp audio file
             if os.path.exists(temp_audio_path):

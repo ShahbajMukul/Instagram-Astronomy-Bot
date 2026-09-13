@@ -62,5 +62,23 @@ class TestReelGenerator(unittest.TestCase):
 
         self.assertIsNone(generator._load_background_music(5))
 
+    @patch("reel_generator.get_ffmpeg_exe", return_value="ffmpeg.exe")
+    @patch("reel_generator.subprocess.run")
+    def test_validate_video_file_rejects_decode_errors(self, mock_run, mock_ffmpeg):
+        mock_run.return_value = MagicMock(
+            returncode=1, stderr="moov atom not found"
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "moov atom not found"):
+            ReelGenerator._validate_video_file("broken.mp4")
+
+        mock_run.assert_called_once_with(
+            ["ffmpeg.exe", "-v", "error", "-i", "broken.mp4", "-f", "null", "-"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+
 if __name__ == "__main__":
     unittest.main()
