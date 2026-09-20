@@ -63,11 +63,6 @@ class ApodApiHelper:
             if data.get("media_type") == "video":
                 continue
 
-            data["explanation"] = (
-                "`This is a random APOD because today's original APOD was a video "
-                "and we couldn't use it` "
-                f"{data['explanation']}"
-            )
             data["copyright"] = data.get("copyright", "").replace("\n", ",").lstrip()
             return data
 
