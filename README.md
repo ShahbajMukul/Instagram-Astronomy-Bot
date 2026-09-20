@@ -35,6 +35,8 @@ pipenv run python main.py
 
 Reels use Cartesia for narration. Put optional background tracks in the `music/` folder at the repository root; `.mp3` and `.wav` files are supported, one is selected randomly, and music is mixed quietly under the narration. You can adjust the folder and volume with `MUSIC_DIR` and `MUSIC_VOLUME` in `.env` (the default volume is `0.12`).
 
+Reel containers can take several minutes to finish processing after upload. The bot polls for up to ten minutes by default; set `REEL_PROCESSING_POLL_SECONDS` to change the ten-second polling interval.
+
 The bot attempts the reel first. If reel creation or publishing fails, it posts the APOD image instead.
 
 ## Contributing

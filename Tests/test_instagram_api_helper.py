@@ -81,7 +81,7 @@ class TestInstagramApiHelper(unittest.TestCase):
     @patch('instagram_api_helper.requests.post')
     @patch('instagram_api_helper.requests.get')
     @patch('instagram_api_helper.os.path.exists', return_value=True)
-    @patch('instagram_api_helper.os.path.getsize', return_value=1234)
+    @patch('instagram_api_helper.os.path.getsize', return_value=5)
     @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data=b'video')
     def test_create_reel_container_reports_upload_failure(
         self, mock_open, mock_getsize, mock_exists, mock_get, mock_post
@@ -97,16 +97,16 @@ class TestInstagramApiHelper(unittest.TestCase):
 
         container_id = self.insta.create_reel_container("dummy.mp4", "caption")
 
-        self.assertEqual(container_id, "67890")
+        self.assertIsNone(container_id)
         upload_headers = mock_post.call_args_list[1].kwargs["headers"]
-        self.assertEqual(upload_headers["file_size"], "1234")
+        self.assertEqual(upload_headers["file_size"], "5")
         self.assertEqual(upload_headers["offset"], "0")
-        self.assertEqual(upload_headers["Content-Length"], "1234")
+        self.assertEqual(upload_headers["Content-Length"], "5")
 
     @patch('instagram_api_helper.requests.post')
     @patch('instagram_api_helper.requests.get')
     @patch('instagram_api_helper.os.path.exists', return_value=True)
-    @patch('instagram_api_helper.os.path.getsize', return_value=1234)
+    @patch('instagram_api_helper.os.path.getsize', return_value=5)
     @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data=b'video')
     def test_create_reel_container_recovers_finished_container(
         self, mock_open, mock_getsize, mock_exists, mock_get, mock_post
@@ -115,7 +115,13 @@ class TestInstagramApiHelper(unittest.TestCase):
         init_response.json.return_value = {"id": "67890", "uri": "upload-url"}
         upload_response = MagicMock()
         upload_response.status_code = 400
-        upload_response.json.return_value = {"error": "processing failed"}
+        upload_response.json.return_value = {
+            "debug_info": {
+                "retriable": False,
+                "type": "ProcessingFailedError",
+                "message": "Request processing failed",
+            }
+        }
         mock_post.side_effect = [init_response, upload_response]
         mock_get.return_value.text = '{"status_code":"FINISHED","status":"Finished"}'
 
@@ -126,7 +132,7 @@ class TestInstagramApiHelper(unittest.TestCase):
     @patch('instagram_api_helper.requests.post')
     @patch('instagram_api_helper.requests.get')
     @patch('instagram_api_helper.os.path.exists', return_value=True)
-    @patch('instagram_api_helper.os.path.getsize', return_value=1234)
+    @patch('instagram_api_helper.os.path.getsize', return_value=5)
     @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data=b'video')
     def test_create_reel_container_keeps_processing_container(
         self, mock_open, mock_getsize, mock_exists, mock_get, mock_post
@@ -135,7 +141,13 @@ class TestInstagramApiHelper(unittest.TestCase):
         init_response.json.return_value = {"id": "67890", "uri": "upload-url"}
         upload_response = MagicMock()
         upload_response.status_code = 400
-        upload_response.json.return_value = {"error": "processing failed"}
+        upload_response.json.return_value = {
+            "debug_info": {
+                "retriable": False,
+                "type": "ProcessingFailedError",
+                "message": "Request processing failed",
+            }
+        }
         mock_post.side_effect = [init_response, upload_response]
         mock_get.return_value.text = '{"status_code":"IN_PROGRESS","status":"Processing"}'
 
@@ -169,6 +181,23 @@ class TestInstagramApiHelper(unittest.TestCase):
 
         self.assertEqual(result, "Reel published successfully!")
         self.assertEqual(mock_status.call_count, 7)
+        mock_publish.assert_called_once_with("67890")
+
+    @patch('time.sleep')
+    @patch('instagram_api_helper.InstagramApiHelper.publish_reel')
+    @patch('instagram_api_helper.InstagramApiHelper.check_container_status')
+    @patch('instagram_api_helper.InstagramApiHelper.create_reel_container')
+    def test_post_reel_allows_slow_processing(
+        self, mock_create, mock_status, mock_publish, mock_sleep
+    ):
+        mock_create.return_value = "67890"
+        mock_status.side_effect = ["IN_PROGRESS"] * 18 + ["FINISHED"]
+        mock_publish.return_value = "Reel published successfully!"
+
+        result = self.insta.post_reel("dummy.mp4", "caption")
+
+        self.assertEqual(result, "Reel published successfully!")
+        self.assertEqual(mock_status.call_count, 19)
         mock_publish.assert_called_once_with("67890")
 
 if __name__ == '__main__':

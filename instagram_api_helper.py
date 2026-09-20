@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import logging
+import time
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 from io import BytesIO  
@@ -94,6 +95,94 @@ class InstagramApiHelper:
         post_id = self.create_media_id(default_image_url, default_image_url, caption)
         return self.publish_media(post_id, caption)
 
+    def _upload_reel_binary(self, upload_uri, video_path, file_size):
+        """Upload the video bytes and classify the upload response for the caller."""
+        upload_headers = {
+            "Authorization": f"OAuth {self.access_token}",
+            "offset": "0",
+            "file_size": str(file_size),
+            "Content-Type": "application/octet-stream",
+            "Content-Length": str(file_size),
+        }
+        retryable_statuses = {408, 429, 500, 502, 503, 504}
+        max_upload_attempts = 3
+
+        for attempt in range(1, max_upload_attempts + 1):
+            logger.info(
+                "REEL 3/4: uploading %d bytes with offset=%s (attempt %d/%d)",
+                file_size,
+                upload_headers["offset"],
+                attempt,
+                max_upload_attempts,
+            )
+            try:
+                with open(video_path, "rb") as video_file:
+                    upload_payload = video_file.read()
+                if len(upload_payload) != file_size:
+                    return "failed", {
+                        "error": (
+                            f"video changed during upload: expected {file_size} bytes, "
+                            f"read {len(upload_payload)}"
+                        )
+                    }
+                upload_response = requests.post(
+                    upload_uri,
+                    headers=upload_headers,
+                    data=upload_payload,
+                    timeout=180,
+                )
+            except (OSError, requests.RequestException) as error:
+                if attempt < max_upload_attempts:
+                    wait_time = 2 ** (attempt - 1)
+                    logger.warning(
+                        "REEL 3/4: upload transport error on attempt %d/%d: %s; "
+                        "retrying in %d seconds",
+                        attempt,
+                        max_upload_attempts,
+                        error,
+                        wait_time,
+                    )
+                    time.sleep(wait_time)
+                    continue
+                return "failed", {"error": str(error)}
+
+            try:
+                upload_data = upload_response.json()
+            except ValueError:
+                upload_data = {"raw_response": upload_response.text}
+
+            if 200 <= upload_response.status_code < 300 and upload_data.get("success", True):
+                return "accepted", upload_data
+
+            if upload_response.status_code in retryable_statuses and attempt < max_upload_attempts:
+                wait_time = 2 ** (attempt - 1)
+                logger.warning(
+                    "REEL 3/4: retryable upload HTTP %s on attempt %d/%d; retrying in %d seconds",
+                    upload_response.status_code,
+                    attempt,
+                    max_upload_attempts,
+                    wait_time,
+                )
+                time.sleep(wait_time)
+                continue
+
+            if upload_response.status_code == 400:
+                error_payload = upload_data.get("error")
+                debug_info = upload_data.get("debug_info")
+                error_type = (
+                    error_payload.get("type")
+                    if isinstance(error_payload, dict)
+                    else None
+                )
+                if not error_type and isinstance(debug_info, dict):
+                    error_type = debug_info.get("type")
+                if error_type == "ProcessingFailedError":
+                    return "processing", upload_data
+
+            return "failed", upload_data
+
+        return "failed", {"error": "upload attempts exhausted"}
+
     def create_reel_container(self, video_path, caption, thumbnail_url=None):
         """Create a container for a reel upload using Instagram Graph API"""
         url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/media"
@@ -178,43 +267,25 @@ class InstagramApiHelper:
                     upload_url.path,
                 )
 
-                upload_headers = {
-                    "Authorization": f"OAuth {self.access_token}",
-                    "offset": "0",
-                    "file_size": str(file_size),
-                    "Content-Type": "application/octet-stream",
-                    "Content-Length": str(file_size),
-                }
-                logger.info(
-                    "REEL 3/4: uploading %d bytes with offset=%s",
-                    file_size,
-                    upload_headers["offset"],
+                upload_state, upload_data = self._upload_reel_binary(
+                    upload_uri, video_path, file_size
                 )
-                with open(video_path, "rb") as video_file:
-                    upload_payload = video_file.read()
-                    upload_response = requests.post(
-                        upload_uri,
-                        headers=upload_headers,
-                        data=upload_payload,
-                        timeout=180,
-                    )
-                try:
-                    upload_data = upload_response.json()
-                except ValueError:
-                    upload_data = {"raw_response": upload_response.text}
-                if upload_response.status_code != 200 or not upload_data.get("success", True):
+                if upload_state == "failed":
                     logger.error(
-                        "REEL 3/4 FAILED: binary upload HTTP %s: %s headers=%s",
-                        upload_response.status_code,
+                        "REEL 3/4 FAILED: binary upload rejected: %s",
                         upload_data,
-                        dict(upload_response.headers),
                     )
-                    logger.warning(
-                        "REEL 3/4: keeping initialized container; Instagram may still be processing the upload",
-                    )
-                    return container_id
+                    return None
 
-                logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
+                if upload_state == "processing":
+                    logger.warning(
+                        "REEL 3/4: Instagram returned ProcessingFailedError for the upload; "
+                        "checking container status before deciding whether it is usable: %s",
+                        upload_data,
+                    )
+                else:
+                    logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
+
 
                 return container_id
 
@@ -282,8 +353,8 @@ class InstagramApiHelper:
         logger.error("REEL 4/4 FAILED: unexpected publish response: %s", data)
         return "Unknown error occurred while publishing reel"
 
-    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=18):
-        """Complete process to post a reel, allowing up to three minutes for processing."""
+    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=60):
+        """Complete the reel upload and allow up to ten minutes for processing."""
         logger.info("REEL: starting publish pipeline for %s", video_path)
         container_id = self.create_reel_container(video_path, caption, thumbnail_url)
         if not container_id:
@@ -291,6 +362,7 @@ class InstagramApiHelper:
             return "Failed to create reel container"
 
         import time
+        wait_time = max(1, int(os.getenv("REEL_PROCESSING_POLL_SECONDS", "10")))
         attempts = 0
         while attempts < max_attempts:
             logger.info(
@@ -315,8 +387,17 @@ class InstagramApiHelper:
                 return "Reel already published"
             
             attempts += 1
-            wait_time = 10
             logger.info("REEL: waiting %d seconds before next status check", wait_time)
             time.sleep(wait_time)
 
-        return "Timeout waiting for video processing. The video may still be processing in the background."
+        logger.error(
+            "REEL FAILED: container did not finish after %d status checks (%d seconds apart); "
+            "container_id=%s",
+            max_attempts,
+            wait_time,
+            container_id,
+        )
+        return (
+            "Timeout waiting for video processing after "
+            f"{max_attempts * wait_time} seconds. Container {container_id} may still be processing."
+        )
