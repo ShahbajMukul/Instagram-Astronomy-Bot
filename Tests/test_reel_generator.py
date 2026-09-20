@@ -80,5 +80,18 @@ class TestReelGenerator(unittest.TestCase):
             timeout=120,
         )
 
+    def test_landscape_image_fits_inside_vertical_canvas(self):
+        target_width = 1080
+        target_height = 1920
+        image_width = 1920
+        image_height = 1080
+        scale = min(target_width / image_width, target_height / image_height)
+
+        fitted_width = int(image_width * scale)
+        fitted_height = int(image_height * scale)
+
+        self.assertEqual((fitted_width, fitted_height), (1080, 607))
+        self.assertLess(fitted_height, target_height)
+
 if __name__ == "__main__":
     unittest.main()

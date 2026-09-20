@@ -282,8 +282,8 @@ class InstagramApiHelper:
         logger.error("REEL 4/4 FAILED: unexpected publish response: %s", data)
         return "Unknown error occurred while publishing reel"
 
-    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=6):
-        """Complete process to post a reel including creation, status checking, and publishing"""
+    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=18):
+        """Complete process to post a reel, allowing up to three minutes for processing."""
         logger.info("REEL: starting publish pipeline for %s", video_path)
         container_id = self.create_reel_container(video_path, caption, thumbnail_url)
         if not container_id:
@@ -315,7 +315,7 @@ class InstagramApiHelper:
                 return "Reel already published"
             
             attempts += 1
-            wait_time = 10  # Increased wait time between checks
+            wait_time = 10
             logger.info("REEL: waiting %d seconds before next status check", wait_time)
             time.sleep(wait_time)
 

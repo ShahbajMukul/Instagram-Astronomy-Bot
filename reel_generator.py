@@ -167,20 +167,15 @@ class ReelGenerator:
             if pil_image.mode != 'RGB':
                 pil_image = pil_image.convert('RGB')
             
-            # Calculate resize dimensions while maintaining aspect ratio
+            # Fit the complete image inside the 9:16 canvas, leaving sidebars when needed.
             target_width = 1080
             target_height = 1920
-            image_ratio = pil_image.width / pil_image.height
-            target_ratio = target_width / target_height  # 9:16 aspect ratio
-            
-            if image_ratio > target_ratio:
-                # Image is wider than target, resize based on height
-                new_height = target_height
-                new_width = int(new_height * image_ratio)
-            else:
-                # Image is taller than target, resize based on width
-                new_width = target_width
-                new_height = int(new_width / image_ratio)
+            scale = min(
+                target_width / pil_image.width,
+                target_height / pil_image.height,
+            )
+            new_width = max(1, int(pil_image.width * scale))
+            new_height = max(1, int(pil_image.height * scale))
             
             resized_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
             
