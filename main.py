@@ -80,6 +80,8 @@ def work():
 
         logger.info("REEL: posting candidate %s", video_path)
         result = instagram_helper.post_reel(video_path=video_path, caption=caption)
+        if result.startswith("Reel processing pending"):
+            raise TimeoutError(result)
         succeeded = result.startswith((
             "Reel published successfully",
             "Reel already published",
@@ -103,6 +105,10 @@ def work():
         print("\n" + reel_result + "\n")
         if video_path and not direct_video and not test_video_path and os.path.exists(video_path):
             os.remove(video_path)
+    except TimeoutError as pending_error:
+        logger.error("REEL PENDING: %s", pending_error)
+        logger.info("REEL PENDING: leaving APOD unrecorded for the next scheduled retry")
+        return
     except Exception as first_error:
         logger.exception("REEL CANDIDATE FAILED: %s", first_error)
         if direct_video:
@@ -114,6 +120,10 @@ def work():
                 print("\n" + reel_result + "\n")
                 if video_path and not test_video_path and os.path.exists(video_path):
                     os.remove(video_path)
+            except TimeoutError as pending_error:
+                logger.error("REEL PENDING: %s", pending_error)
+                logger.info("REEL PENDING: leaving APOD unrecorded for the next scheduled retry")
+                return
             except Exception as random_error:
                 logger.exception("RANDOM APOD REEL FAILED: %s", random_error)
                 fallback_caption = instagram_helper.write_caption(

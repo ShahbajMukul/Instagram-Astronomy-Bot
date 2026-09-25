@@ -166,19 +166,6 @@ class InstagramApiHelper:
                 time.sleep(wait_time)
                 continue
 
-            if upload_response.status_code == 400:
-                error_payload = upload_data.get("error")
-                debug_info = upload_data.get("debug_info")
-                error_type = (
-                    error_payload.get("type")
-                    if isinstance(error_payload, dict)
-                    else None
-                )
-                if not error_type and isinstance(debug_info, dict):
-                    error_type = debug_info.get("type")
-                if error_type == "ProcessingFailedError":
-                    return "processing", upload_data
-
             return "failed", upload_data
 
         return "failed", {"error": "upload attempts exhausted"}
@@ -277,14 +264,7 @@ class InstagramApiHelper:
                     )
                     return None
 
-                if upload_state == "processing":
-                    logger.warning(
-                        "REEL 3/4: Instagram returned ProcessingFailedError for the upload; "
-                        "checking container status before deciding whether it is usable: %s",
-                        upload_data,
-                    )
-                else:
-                    logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
+                logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
 
 
                 return container_id
@@ -353,16 +333,21 @@ class InstagramApiHelper:
         logger.error("REEL 4/4 FAILED: unexpected publish response: %s", data)
         return "Unknown error occurred while publishing reel"
 
-    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=60):
-        """Complete the reel upload and allow up to ten minutes for processing."""
+    def post_reel(self, video_path, caption, thumbnail_url=None, max_attempts=None):
+        """Upload and publish a reel, leaving slow processing available for retry."""
         logger.info("REEL: starting publish pipeline for %s", video_path)
         container_id = self.create_reel_container(video_path, caption, thumbnail_url)
         if not container_id:
             logger.error("REEL FAILED: no usable container was created")
             return "Failed to create reel container"
 
-        import time
-        wait_time = max(1, int(os.getenv("REEL_PROCESSING_POLL_SECONDS", "10")))
+        wait_time = max(1, int(os.getenv("REEL_PROCESSING_POLL_SECONDS", "60")))
+        if max_attempts is None:
+            max_wait_seconds = max(
+                wait_time,
+                int(os.getenv("REEL_PROCESSING_MAX_SECONDS", "300")),
+            )
+            max_attempts = max(1, (max_wait_seconds + wait_time - 1) // wait_time)
         attempts = 0
         while attempts < max_attempts:
             logger.info(
@@ -387,17 +372,20 @@ class InstagramApiHelper:
                 return "Reel already published"
             
             attempts += 1
+            if attempts >= max_attempts:
+                break
             logger.info("REEL: waiting %d seconds before next status check", wait_time)
             time.sleep(wait_time)
 
         logger.error(
-            "REEL FAILED: container did not finish after %d status checks (%d seconds apart); "
+            "REEL PENDING: container did not finish after %d status checks (%d seconds apart); "
             "container_id=%s",
             max_attempts,
             wait_time,
             container_id,
         )
         return (
-            "Timeout waiting for video processing after "
-            f"{max_attempts * wait_time} seconds. Container {container_id} may still be processing."
+            "Reel processing pending after "
+            f"{max_attempts * wait_time} seconds. Container {container_id} may still be processing; "
+            "retrying on the next scheduled run."
         )

@@ -108,7 +108,7 @@ class TestInstagramApiHelper(unittest.TestCase):
     @patch('instagram_api_helper.os.path.exists', return_value=True)
     @patch('instagram_api_helper.os.path.getsize', return_value=5)
     @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data=b'video')
-    def test_create_reel_container_recovers_finished_container(
+    def test_create_reel_container_rejects_processing_failed_upload(
         self, mock_open, mock_getsize, mock_exists, mock_get, mock_post
     ):
         init_response = MagicMock()
@@ -123,18 +123,17 @@ class TestInstagramApiHelper(unittest.TestCase):
             }
         }
         mock_post.side_effect = [init_response, upload_response]
-        mock_get.return_value.text = '{"status_code":"FINISHED","status":"Finished"}'
-
         container_id = self.insta.create_reel_container("dummy.mp4", "caption")
 
-        self.assertEqual(container_id, "67890")
+        self.assertIsNone(container_id)
+        mock_get.assert_not_called()
 
     @patch('instagram_api_helper.requests.post')
     @patch('instagram_api_helper.requests.get')
     @patch('instagram_api_helper.os.path.exists', return_value=True)
     @patch('instagram_api_helper.os.path.getsize', return_value=5)
     @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data=b'video')
-    def test_create_reel_container_keeps_processing_container(
+    def test_create_reel_container_rejects_processing_failed_upload_without_status_poll(
         self, mock_open, mock_getsize, mock_exists, mock_get, mock_post
     ):
         init_response = MagicMock()
@@ -149,11 +148,10 @@ class TestInstagramApiHelper(unittest.TestCase):
             }
         }
         mock_post.side_effect = [init_response, upload_response]
-        mock_get.return_value.text = '{"status_code":"IN_PROGRESS","status":"Processing"}'
-
         container_id = self.insta.create_reel_container("dummy.mp4", "caption")
 
-        self.assertEqual(container_id, "67890")
+        self.assertIsNone(container_id)
+        mock_get.assert_not_called()
 
     @patch('instagram_api_helper.InstagramApiHelper.publish_reel')
     @patch('instagram_api_helper.InstagramApiHelper.check_container_status')
@@ -177,7 +175,7 @@ class TestInstagramApiHelper(unittest.TestCase):
         mock_status.side_effect = ["IN_PROGRESS"] * 6 + ["FINISHED"]
         mock_publish.return_value = "Reel published successfully!"
 
-        result = self.insta.post_reel("dummy.mp4", "caption")
+        result = self.insta.post_reel("dummy.mp4", "caption", max_attempts=7)
 
         self.assertEqual(result, "Reel published successfully!")
         self.assertEqual(mock_status.call_count, 7)
@@ -194,7 +192,7 @@ class TestInstagramApiHelper(unittest.TestCase):
         mock_status.side_effect = ["IN_PROGRESS"] * 18 + ["FINISHED"]
         mock_publish.return_value = "Reel published successfully!"
 
-        result = self.insta.post_reel("dummy.mp4", "caption")
+        result = self.insta.post_reel("dummy.mp4", "caption", max_attempts=19)
 
         self.assertEqual(result, "Reel published successfully!")
         self.assertEqual(mock_status.call_count, 19)

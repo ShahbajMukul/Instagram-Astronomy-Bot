@@ -225,5 +225,41 @@ class TestMainWorkflow(unittest.TestCase):
             "https://example.com/random.jpg", "Random narration."
         )
 
+    @patch('main.open', create=True)
+    @patch('main.os.path.exists', return_value=False)
+    @patch('main.ReelGenerator')
+    @patch('main.InstagramApiHelper')
+    @patch('main.GeminiProcessing')
+    @patch('main.ApodApiHelper')
+    def test_work_does_not_fallback_to_image_when_reel_is_still_processing(
+        self,
+        mock_apod_cls,
+        mock_gemini_cls,
+        mock_insta_cls,
+        mock_reel_cls,
+        mock_exists,
+        mock_open,
+    ):
+        mock_apod_cls.return_value.get_apod_data.return_value = {
+            "title": "Slow Reel",
+            "copyright": "NASA",
+            "date": "2026-01-01",
+            "explanation": "Video explanation.",
+            "media_type": "video",
+            "url": "https://example.com/apod.mp4",
+        }
+        mock_gemini_cls.return_value.generate_content.return_value = "Narration."
+        mock_gemini_cls.extract_hashtags.return_value = ""
+        mock_insta = mock_insta_cls.return_value
+        mock_insta.write_caption.return_value = "Caption"
+        mock_insta.post_reel.return_value = (
+            "Reel processing pending after 1200 seconds."
+        )
+
+        main.work()
+
+        mock_insta.create_media_id.assert_not_called()
+        mock_insta.post_reel.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main()
