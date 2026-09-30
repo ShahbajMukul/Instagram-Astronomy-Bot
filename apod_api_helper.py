@@ -15,7 +15,7 @@ class ApodApiHelper:
     def get_apod_data(self, max_attempts: int = 3, timeout: int = 30):
         print("Fetching data from NASA APOD API...")
         api_key = os.getenv("NASA_API_KEY", "DEMO_KEY")
-        url = f"https://api.nasa.gov/planetary/apod?api_key={api_key}&thumbs=True"
+        url = f"https://science.nasa.gov/wp-json/wp/v2/apod-basic/?api_key={api_key}&thumbs=True"
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
