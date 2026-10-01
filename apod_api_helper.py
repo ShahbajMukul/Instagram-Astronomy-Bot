@@ -28,6 +28,10 @@ class ApodApiHelper:
                 response = requests.get(url, headers=headers, timeout=timeout)
                 response.raise_for_status()
                 data = response.json()
+                if isinstance(data, list):
+                    if not data:
+                        raise ValueError("NASA APOD API returned an empty list")
+                    data = data[0]
                 data["copyright"] = data.get("copyright", "")
                 data["copyright"] = data["copyright"].replace("\n", ",").lstrip()
                 return data
