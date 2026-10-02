@@ -153,6 +153,28 @@ class TestInstagramApiHelper(unittest.TestCase):
         self.assertIsNone(container_id)
         mock_get.assert_not_called()
 
+    @patch('instagram_api_helper.requests.post')
+    @patch('instagram_api_helper.os.path.exists', return_value=True)
+    @patch('instagram_api_helper.os.path.getsize', return_value=5)
+    @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data=b'video')
+    def test_create_reel_container_does_not_retry_non_retriable_upload(
+        self, mock_open, mock_getsize, mock_exists, mock_post
+    ):
+        init_response = MagicMock()
+        init_response.json.return_value = {"id": "67890", "uri": "upload-url"}
+        upload_response = MagicMock()
+        upload_response.status_code = 500
+        upload_response.headers = {"x-fb-trace-id": "trace-123"}
+        upload_response.json.return_value = {
+            "debug_info": {"retriable": False, "message": "Request processing failed"}
+        }
+        mock_post.side_effect = [init_response, upload_response]
+
+        container_id = self.insta.create_reel_container("dummy.mp4", "caption")
+
+        self.assertIsNone(container_id)
+        self.assertEqual(mock_post.call_count, 2)
+
     @patch('instagram_api_helper.InstagramApiHelper.publish_reel')
     @patch('instagram_api_helper.InstagramApiHelper.check_container_status')
     @patch('instagram_api_helper.InstagramApiHelper.create_reel_container')

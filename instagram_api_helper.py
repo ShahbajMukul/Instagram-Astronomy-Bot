@@ -151,8 +151,23 @@ class InstagramApiHelper:
             except ValueError:
                 upload_data = {"raw_response": upload_response.text}
 
+            logger.info(
+                "REEL 3/4: upload response HTTP %s headers=%s body=%s",
+                upload_response.status_code,
+                dict(upload_response.headers),
+                upload_data,
+            )
+
             if 200 <= upload_response.status_code < 300 and upload_data.get("success", True):
                 return "accepted", upload_data
+
+            debug_info = upload_data.get("debug_info", {})
+            if isinstance(debug_info, dict) and debug_info.get("retriable") is False:
+                logger.error(
+                    "REEL 3/4: upload marked non-retriable by Meta: %s",
+                    debug_info,
+                )
+                return "failed", upload_data
 
             if upload_response.status_code in retryable_statuses and attempt < max_upload_attempts:
                 wait_time = 2 ** (attempt - 1)
