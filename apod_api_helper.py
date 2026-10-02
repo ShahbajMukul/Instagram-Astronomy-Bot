@@ -1,6 +1,8 @@
 import os
 import time
 import random
+import html
+import re
 import requests
 from datetime import date, timedelta
 from dotenv import load_dotenv
@@ -11,6 +13,13 @@ load_dotenv()
 class ApodApiHelper:
     def __init__(self):
         load_dotenv()
+
+    @staticmethod
+    def _strip_html(value: str) -> str:
+        value = html.unescape(value)
+        value = re.sub(r"(?i)<br\s*/?>", "\n", value)
+        value = re.sub(r"<[^>]+>", "", value)
+        return value.strip()
 
     def get_apod_data(self, max_attempts: int = 3, timeout: int = 30):
         print("Fetching data from NASA APOD API...")
@@ -32,6 +41,9 @@ class ApodApiHelper:
                     if not data:
                         raise ValueError("NASA APOD API returned an empty list")
                     data = data[0]
+                for field in ("explanation", "copyright"):
+                    if isinstance(data.get(field), str):
+                        data[field] = self._strip_html(data[field])
                 data["copyright"] = data.get("copyright", "")
                 data["copyright"] = data["copyright"].replace("\n", ",").lstrip()
                 return data
@@ -54,19 +66,24 @@ class ApodApiHelper:
             )
             date_string = random_date.isoformat()
             url = (
-                "https://api.nasa.gov/planetary/apod?"
-                f"start_date={date_string}&end_date={date_string}&api_key={api_key}"
+                "https://science.nasa.gov/wp-json/wp/v2/apod-basic/?"
+                f"api_key={api_key}&date={date_string}"
             )
 
             response = requests.get(url, timeout=timeout)
             response.raise_for_status()
             data = response.json()
             if isinstance(data, list):
+                if not data:
+                    continue
                 data = data[0]
 
             if data.get("media_type") == "video":
                 continue
 
+            for field in ("explanation", "copyright"):
+                if isinstance(data.get(field), str):
+                    data[field] = self._strip_html(data[field])
             data["copyright"] = data.get("copyright", "").replace("\n", ",").lstrip()
             return data
 

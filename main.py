@@ -14,6 +14,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def _get_image_url(candidate):
+    image_url = candidate.get("url")
+    if (
+        candidate.get("hdurl")
+        and isinstance(image_url, str)
+        and "/image-article/" in image_url
+    ):
+        return candidate["hdurl"]
+    return image_url or candidate.get("hdurl")
+
 def work():
     logger.info(
         "RUN SOURCE: %s",
@@ -54,7 +64,7 @@ def work():
         image_by = candidate.get("copyright")
         explanation = candidate["explanation"]
         candidate_date = datetime.strptime(candidate["date"], "%Y-%m-%d").strftime("%m/%d/%Y")
-        image_url = candidate.get("url")
+        image_url = _get_image_url(candidate)
 
         if test_video_path:
             bot_says = ""
@@ -151,7 +161,7 @@ def work():
                 candidate["explanation"],
             )
             try:
-                image_url = candidate.get("url")
+                image_url = _get_image_url(candidate)
                 media_id = instagram_helper.create_media_id(
                     candidate.get("hdurl", image_url), image_url, fallback_caption
                 )

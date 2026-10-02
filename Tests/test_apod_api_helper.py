@@ -22,7 +22,14 @@ def test_get_apod_data(mock_get):
 @patch('apod_api_helper.requests.get')
 def test_get_apod_data_selects_first_apod_from_list(mock_get):
     mock_get.return_value.json.return_value = [
-        {"date": "2026-10-01", "title": "Today's APOD"},
+        {
+            "date": "2026-10-01",
+            "title": "Today's APOD",
+            "url": "https://science.nasa.gov/image-article/todays-apod/",
+            "hdurl": "https://assets.science.nasa.gov/todays-apod.jpg",
+            "explanation": "<strong>Explanation:</strong> A bright <a href=\"https://example.com\">moon</a>.",
+            "copyright": "<a href=\"https://example.com\">NASA</a>",
+        },
         {"date": "2026-09-30", "title": "Yesterday's APOD"},
     ]
     mock_get.return_value.raise_for_status.return_value = None
@@ -32,6 +39,10 @@ def test_get_apod_data_selects_first_apod_from_list(mock_get):
 
     assert data["date"] == "2026-10-01"
     assert data["title"] == "Today's APOD"
+    assert data["url"] == "https://science.nasa.gov/image-article/todays-apod/"
+    assert data["hdurl"] == "https://assets.science.nasa.gov/todays-apod.jpg"
+    assert data["explanation"] == "Explanation: A bright moon."
+    assert data["copyright"] == "NASA"
 
 @patch('apod_api_helper.requests.get')
 def test_get_apod_data_wrong_cr_format(mock_get):
@@ -65,8 +76,8 @@ def test_get_random_apod_data_uses_single_random_date(mock_get):
     data = helper.get_random_apod_data()
 
     requested_url = mock_get.call_args.args[0]
-    assert "start_date=" in requested_url
-    assert "end_date=" in requested_url
+    assert "date=" in requested_url
+    assert "science.nasa.gov/wp-json/wp/v2/apod-basic/" in requested_url
     assert data["copyright"] == "NASA,ESA"
 
 
