@@ -13,6 +13,9 @@ from moviepy.audio.fx.AudioLoop import AudioLoop
 from PIL import Image
 import requests
 from io import BytesIO
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ReelGenerator:
     CARTESIA_VOICE_IDS = (
@@ -25,11 +28,26 @@ class ReelGenerator:
         "e3827ec5-697a-4b7c-9704-1a23041bbc51",
         "8f091740-3df1-4795-8bd9-dc62d88e5131",
     )
+    DEEPGRAM_VOICES = (
+        ("flux-1-sienna-en", "v2"),
+        ("flux-1-maeve-en", "v2"),
+        ("flux-1-rufus-en", "v2"),
+        ("aura-2-aries-en", "v1"),
+        ("aura-2-thalia-en", "v1"),
+        ("aura-2-helena-en", "v1"),
+        ("aura-2-arcas-en", "v1"),
+        ("aura-2-athena-en", "v1"),
+        ("aura-2-delia-en", "v1"),
+        ("aura-2-iris-en", "v1"),
+        ("aura-2-janus-en", "v1"),
+        ("aura-2-neptune-en", "v1"),
+    )
 
     def __init__(self):
         load_dotenv()
         self.cartesia_key = os.getenv("CARTESIA_KEY") or os.getenv("CARTESIA_API_KEY")
         self.cartesia_model = os.getenv("CARTESIA_MODEL", "sonic-latest")
+        self.deepgram_key = os.getenv("DEEPGRAM_API_KEY")
         self.music_directory = os.getenv("MUSIC_DIR", "music")
         self.music_volume = float(os.getenv("MUSIC_VOLUME", "0.12"))
         self.cartesia_client = (
@@ -50,17 +68,18 @@ class ReelGenerator:
             return truncated[:last_punct + 1].strip()
         return truncated.rsplit(' ', 1)[0].strip() + '.'
 
-    def generate_speech(self, text):
-        """Generate a WAV voiceover with Cartesia using a random available voice."""
-        if not self.cartesia_client:
-            raise ValueError("CARTESIA_KEY is not configured.")
-
+    @staticmethod
+    def _clean_speech_text(text):
         # Remove URLs and hashtags
         clean_text = re.sub(r'https?://\S+', '', text)
         clean_text = re.sub(r'#\w+', '', clean_text)
         # Remove unsupported symbols while preserving words and basic punctuation
         clean_text = re.sub(r"[^\w\s.,!?'\":;\-()]", '', clean_text)
-        clean_text = ' '.join(clean_text.split())
+        return ' '.join(clean_text.split())
+
+    def _generate_cartesia_speech(self, clean_text):
+        if not self.cartesia_client:
+            raise ValueError("CARTESIA_KEY is not configured.")
 
         voice_id = random.choice(self.CARTESIA_VOICE_IDS)
 
@@ -77,13 +96,60 @@ class ReelGenerator:
         )
 
         temp_audio_path = os.path.join(tempfile.gettempdir(), "cartesia_tts.wav")
-        response.write_to_file(temp_audio_path)
-        temp_audio = BytesIO()
-        with open(temp_audio_path, "rb") as audio_file:
-            temp_audio.write(audio_file.read())
-        os.remove(temp_audio_path)
-        temp_audio.seek(0)
-        return temp_audio
+        try:
+            response.write_to_file(temp_audio_path)
+            temp_audio = BytesIO()
+            with open(temp_audio_path, "rb") as audio_file:
+                temp_audio.write(audio_file.read())
+            temp_audio.seek(0)
+            return temp_audio
+        finally:
+            if os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+
+    def _generate_deepgram_speech(self, clean_text):
+        if not self.deepgram_key:
+            raise ValueError("DEEPGRAM_API_KEY is not configured.")
+
+        voice, api_version = random.choice(self.DEEPGRAM_VOICES)
+        response = requests.post(
+            f"https://api.deepgram.com/{api_version}/speak",
+            params={
+                "model": voice,
+                "encoding": "linear16",
+                "sample_rate": "44100",
+                "container": "wav",
+            },
+            headers={
+                "Authorization": f"Token {self.deepgram_key}",
+                "Content-Type": "application/json",
+            },
+            json={"text": clean_text},
+            timeout=60,
+        )
+        response.raise_for_status()
+        if not response.content:
+            raise ValueError("Deepgram returned an empty audio response.")
+        return BytesIO(response.content)
+
+    def generate_speech(self, text):
+        """Generate speech with Cartesia, falling back to Deepgram if needed."""
+        clean_text = self._clean_speech_text(text)
+        cartesia_error = None
+
+        try:
+            return self._generate_cartesia_speech(clean_text)
+        except Exception as error:
+            cartesia_error = error
+            logger.warning("Cartesia TTS failed; trying Deepgram: %s", error)
+
+        try:
+            return self._generate_deepgram_speech(clean_text)
+        except Exception as deepgram_error:
+            raise RuntimeError(
+                "Both Cartesia and Deepgram TTS failed. "
+                f"Cartesia: {cartesia_error}; Deepgram: {deepgram_error}"
+            ) from deepgram_error
 
     def _load_background_music(self, duration):
         music_files = [

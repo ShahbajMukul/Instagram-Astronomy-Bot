@@ -53,6 +53,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           CARTESIA_KEY: ${{ secrets.CARTESIA_KEY }}
           CARTESIA_MODEL: ${{ secrets.CARTESIA_MODEL }}
+          DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
           MUSIC_DIR: music
           MUSIC_VOLUME: "0.12"
           TEST_VIDEO_PATH: ${{ inputs.test_video_path }}

@@ -30,6 +30,7 @@ class TestReelGenerator(unittest.TestCase):
         mock_getenv.side_effect = lambda key, default=None: {
             "CARTESIA_KEY": "test-key",
             "CARTESIA_MODEL": "sonic-latest",
+            "DEEPGRAM_API_KEY": None,
         }.get(key, default)
         mock_response = MagicMock()
         mock_response.write_to_file.side_effect = lambda path: open(
@@ -50,6 +51,44 @@ class TestReelGenerator(unittest.TestCase):
         self.assertIn(
             mock_client.tts.generate.call_args.kwargs["voice"],
             set(ReelGenerator.CARTESIA_VOICE_IDS),
+        )
+
+    @patch("reel_generator.requests.post")
+    @patch("reel_generator.Cartesia")
+    @patch("reel_generator.os.getenv")
+    def test_generate_speech_falls_back_to_deepgram(
+        self, mock_getenv, mock_cartesia, mock_post
+    ):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "CARTESIA_KEY": "cartesia-key",
+            "DEEPGRAM_API_KEY": "deepgram-key",
+        }.get(key, default)
+        mock_cartesia.return_value.tts.generate.side_effect = RuntimeError(
+            "Cartesia unavailable"
+        )
+        mock_response = MagicMock(content=b"deepgram wav")
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        rg = ReelGenerator()
+        audio_stream = rg.generate_speech("Hello universe!")
+
+        self.assertEqual(audio_stream.read(), b"deepgram wav")
+        mock_post.assert_called_once()
+        request = mock_post.call_args
+        self.assertIn(
+            request.args[0],
+            {
+                "https://api.deepgram.com/v1/speak",
+                "https://api.deepgram.com/v2/speak",
+            },
+        )
+        self.assertIn(
+            request.kwargs["params"]["model"],
+            set(voice for voice, _ in ReelGenerator.DEEPGRAM_VOICES),
+        )
+        self.assertEqual(
+            request.kwargs["headers"]["Authorization"], "Token deepgram-key"
         )
 
     @patch('reel_generator.os.listdir', return_value=[])
