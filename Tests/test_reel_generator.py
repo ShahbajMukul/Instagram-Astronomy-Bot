@@ -91,6 +91,58 @@ class TestReelGenerator(unittest.TestCase):
             request.kwargs["headers"]["Authorization"], "Token deepgram-key"
         )
 
+    def test_deepgram_flux_voices_are_v2_identifiers(self):
+        flux_voices = [
+            voice
+            for voice, api_version in ReelGenerator.DEEPGRAM_VOICES
+            if api_version == "v2" and voice.startswith("flux-")
+        ]
+        self.assertTrue(flux_voices)
+        for voice in flux_voices:
+            self.assertNotIn("flux-1-", voice)
+
+    @patch("reel_generator.requests.post")
+    @patch("reel_generator.random.choice")
+    def test_generate_deepgram_speech_uses_v2_flux_model(
+        self, mock_choice, mock_post
+    ):
+        mock_choice.return_value = ("flux-sienna-en", "v2")
+        mock_post.return_value = MagicMock(
+            ok=True,
+            content=b"deepgram wav",
+        )
+        generator = ReelGenerator.__new__(ReelGenerator)
+        generator.deepgram_key = "deepgram-key"
+
+        audio_stream = generator._generate_deepgram_speech("Hello universe!")
+
+        self.assertEqual(audio_stream.read(), b"deepgram wav")
+        mock_post.assert_called_once()
+        request = mock_post.call_args
+        self.assertEqual(request.args[0], "https://api.deepgram.com/v2/speak")
+        self.assertEqual(request.kwargs["params"]["model"], "flux-sienna-en")
+
+    @patch("reel_generator.requests.post")
+    @patch("reel_generator.random.choice")
+    def test_generate_deepgram_speech_includes_provider_error_without_api_key(
+        self, mock_choice, mock_post
+    ):
+        mock_choice.return_value = ("flux-sienna-en", "v2")
+        mock_post.return_value = MagicMock(
+            ok=False,
+            status_code=400,
+            reason="Bad Request",
+            text='{"error":"invalid model flux-sienna-en"}',
+            content=b"",
+        )
+        generator = ReelGenerator.__new__(ReelGenerator)
+        generator.deepgram_key = "super-secret-key"
+
+        with self.assertRaisesRegex(RuntimeError, "invalid model flux-sienna-en") as ctx:
+            generator._generate_deepgram_speech("Hello universe!")
+
+        self.assertNotIn("super-secret-key", str(ctx.exception))
+
     @patch('reel_generator.os.listdir', return_value=[])
     @patch('reel_generator.os.path.isdir', return_value=True)
     def test_load_background_music_returns_none_when_folder_is_empty(
