@@ -104,6 +104,9 @@ class GeminiProcessing:
         # Strip remaining HTML tags
         text = re.sub(r"<[^>]+>", "", text)
 
+        # Remove one leading NASA explanation label so TTS does not read it aloud.
+        text = re.sub(r"(?i)^\s*explanation\s*:\s*", "", text, count=1)
+
         # Convert markdown links [text](url) -> text
         text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
 
