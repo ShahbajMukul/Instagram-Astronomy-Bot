@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 instagram_id = os.getenv("INSTAGRAM_ID")
 instagram_access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 
+REEL_UPLOAD_RECOVERY_POLL_SECONDS_DEFAULT = 5
+REEL_UPLOAD_RECOVERY_POLL_SECONDS_MIN = 1
+REEL_UPLOAD_RECOVERY_POLL_SECONDS_MAX = 5
+REEL_UPLOAD_RECOVERY_ATTEMPTS_DEFAULT = 3
+REEL_UPLOAD_RECOVERY_ATTEMPTS_MIN = 1
+REEL_UPLOAD_RECOVERY_ATTEMPTS_MAX = 3
+
 class InstagramApiHelper:
     def __init__(self):
         load_dotenv()
@@ -185,6 +192,91 @@ class InstagramApiHelper:
 
         return "failed", {"error": "upload attempts exhausted"}
 
+    def _get_clamped_env_int(self, env_name, default_value, min_value, max_value):
+        raw_value = os.getenv(env_name, str(default_value))
+        try:
+            parsed_value = int(raw_value)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid %s=%r; using default %d",
+                env_name,
+                raw_value,
+                default_value,
+            )
+            return default_value
+
+        clamped_value = max(min_value, min(max_value, parsed_value))
+        if clamped_value != parsed_value:
+            logger.warning(
+                "Clamping %s from %d to %d (allowed range %d-%d)",
+                env_name,
+                parsed_value,
+                clamped_value,
+                min_value,
+                max_value,
+            )
+        return clamped_value
+
+    def _recover_reel_container_after_upload_failure(self, container_id, upload_data):
+        poll_seconds = self._get_clamped_env_int(
+            "REEL_UPLOAD_RECOVERY_POLL_SECONDS",
+            REEL_UPLOAD_RECOVERY_POLL_SECONDS_DEFAULT,
+            REEL_UPLOAD_RECOVERY_POLL_SECONDS_MIN,
+            REEL_UPLOAD_RECOVERY_POLL_SECONDS_MAX,
+        )
+        max_attempts = self._get_clamped_env_int(
+            "REEL_UPLOAD_RECOVERY_ATTEMPTS",
+            REEL_UPLOAD_RECOVERY_ATTEMPTS_DEFAULT,
+            REEL_UPLOAD_RECOVERY_ATTEMPTS_MIN,
+            REEL_UPLOAD_RECOVERY_ATTEMPTS_MAX,
+        )
+
+        logger.warning(
+            "REEL 3/4: upload failed; starting bounded recovery for container %s "
+            "(attempts=%d, poll_seconds=%d, max_wait=%d). upload_response=%s",
+            container_id,
+            max_attempts,
+            poll_seconds,
+            max_attempts * poll_seconds,
+            upload_data,
+        )
+        for attempt in range(1, max_attempts + 1):
+            status = self.check_container_status(container_id)
+            logger.info(
+                "REEL 3/4: bounded recovery attempt %d/%d for container %s -> status=%s",
+                attempt,
+                max_attempts,
+                container_id,
+                status,
+            )
+
+            if status in {"FINISHED", "PUBLISHED"}:
+                logger.warning(
+                    "REEL 3/4: recovering from upload failure because container %s reached %s",
+                    container_id,
+                    status,
+                )
+                return True
+
+            if status == "IN_PROGRESS":
+                if attempt < max_attempts:
+                    time.sleep(poll_seconds)
+                continue
+
+            logger.error(
+                "REEL 3/4: bounded recovery aborted for container %s due to terminal status=%s",
+                container_id,
+                status,
+            )
+            return False
+
+        logger.error(
+            "REEL 3/4: bounded recovery exhausted for container %s after %d attempts",
+            container_id,
+            max_attempts,
+        )
+        return False
+
     def create_reel_container(self, video_path, caption, thumbnail_url=None):
         """Create a container for a reel upload using Instagram Graph API"""
         url = f"https://graph.facebook.com/v26.0/{self.instagram_id}/media"
@@ -277,6 +369,10 @@ class InstagramApiHelper:
                         "REEL 3/4 FAILED: binary upload rejected: %s",
                         upload_data,
                     )
+                    if self._recover_reel_container_after_upload_failure(
+                        container_id, upload_data
+                    ):
+                        return container_id
                     return None
 
                 logger.info("REEL 3/4: binary upload accepted: %s", upload_data)
