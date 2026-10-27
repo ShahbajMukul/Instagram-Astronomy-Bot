@@ -58,6 +58,27 @@ class TestGeminiProcessingSanitization(unittest.TestCase):
         result = GeminiProcessing.sanitize_output(input_text)
         self.assertEqual(result, expected)
 
+    def test_sanitize_output_strips_leading_explanation_prefix(self):
+        input_text = "Explanation: A bright galaxy appears..."
+        expected = "A bright galaxy appears..."
+        result = GeminiProcessing.sanitize_output(input_text)
+        self.assertEqual(result, expected)
+
+    def test_generate_content_fallback_strips_leading_explanation_prefix(self):
+        processor = GeminiProcessing.__new__(GeminiProcessing)
+        processor.system_prompt = "prompt"
+        processor.model_name = "model"
+        processor.client = MagicMock()
+        processor.client.models.generate_content.side_effect = Exception(
+            "Server disconnected without sending a response."
+        )
+
+        result = processor.generate_content(
+            "Explanation: A bright galaxy appears..."
+        )
+
+        self.assertEqual(result, "A bright galaxy appears...")
+
     def test_extract_response_text_ignores_thought_parts(self):
         candidate = MagicMock()
         thought_part = MagicMock()
