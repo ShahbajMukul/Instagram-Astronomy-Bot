@@ -29,9 +29,9 @@ class ReelGenerator:
         "8f091740-3df1-4795-8bd9-dc62d88e5131",
     )
     DEEPGRAM_VOICES = (
-        ("flux-1-sienna-en", "v2"),
-        ("flux-1-maeve-en", "v2"),
-        ("flux-1-rufus-en", "v2"),
+        ("flux-sienna-en", "v2"),
+        ("flux-maeve-en", "v2"),
+        ("flux-rufus-en", "v2"),
         ("aura-2-aries-en", "v1"),
         ("aura-2-thalia-en", "v1"),
         ("aura-2-helena-en", "v1"),
@@ -127,7 +127,17 @@ class ReelGenerator:
             json={"text": clean_text},
             timeout=60,
         )
-        response.raise_for_status()
+        if not response.ok:
+            response_excerpt = " ".join((response.text or "").split())[:300]
+            if response_excerpt:
+                response_excerpt = response_excerpt.replace(
+                    self.deepgram_key, "[REDACTED]"
+                )
+            raise RuntimeError(
+                "Deepgram TTS request failed "
+                f"({response.status_code} {response.reason}). "
+                f"Response body: {response_excerpt or '<empty>'}"
+            )
         if not response.content:
             raise ValueError("Deepgram returned an empty audio response.")
         return BytesIO(response.content)
